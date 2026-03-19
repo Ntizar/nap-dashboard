@@ -138,7 +138,7 @@ export default function Overview({ onMenuToggle }: OverviewProps) {
 
   const totalFicheros = datasets.reduce((s, ds) => s + (ds.ficherosDto?.length ?? 0), 0)
   const totalValidados = datasets.filter(ds => ds.ficherosDto?.some(f => f.validado)).length
-  const totalAlertas = datasets.filter(ds => ds.ficherosDto?.some(f => Array.isArray(f.avisos) && (f.avisos as unknown[]).length > 0)).length
+  const totalAlertas = datasets.filter(ds => ds.ficherosDto?.some(f => Array.isArray(f.avisos) && ((f.avisos as unknown[] | undefined)?.length ?? 0) > 0)).length
 
   const isLoading = loadingDs || loadingTT || loadingOrg || loadingReg
 
@@ -205,7 +205,7 @@ export default function Overview({ onMenuToggle }: OverviewProps) {
 
         {/* KPIs fila 2 — secundarios */}
         {!isLoading && (
-          <div className="grid grid-cols-3 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
             <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a56a0" strokeWidth="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -299,7 +299,7 @@ export default function Overview({ onMenuToggle }: OverviewProps) {
               />
               <HorizontalBarChart
                 data={byFormat}
-                title="Distribución por formato"
+                title="Ficheros por formato"
               />
             </>
           )}

@@ -585,3 +585,45 @@ export function headwayLabel(secs: number): string {
   const m = min % 60
   return m > 0 ? `${h}h ${m}min` : `${h}h`
 }
+
+/** Convert a Date to GTFS date string 'YYYYMMDD' */
+export function formatGtfsDate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}${m}${d}`
+}
+
+/** Get calendar_dates.txt exceptions for a given service_id and date */
+export function getExceptionsForDate(
+  serviceId: string,
+  date: Date,
+  calendarDatesByServiceId: Map<string, GtfsCalendarDate[]>
+): GtfsCalendarDate[] {
+  const dateStr = formatGtfsDate(date)
+  return (calendarDatesByServiceId.get(serviceId) ?? []).filter(cd => cd.date === dateStr)
+}
+
+/**
+ * Returns true if a service operates on the given date.
+ * calendar_dates.txt overrides take precedence over calendar.txt base rules.
+ */
+export function isServiceActive(
+  serviceId: string,
+  date: Date,
+  calendarByServiceId: Map<string, GtfsCalendar>,
+  calendarDatesByServiceId: Map<string, GtfsCalendarDate[]>
+): boolean {
+  const dateStr = formatGtfsDate(date)
+  // Check calendar_dates overrides first
+  const exceptions = calendarDatesByServiceId.get(serviceId) ?? []
+  const override = exceptions.find(cd => cd.date === dateStr)
+  if (override !== undefined) return override.exception_type === 1 // 1=added, 2=removed
+
+  // Fall back to calendar.txt base schedule
+  const cal = calendarByServiceId.get(serviceId)
+  if (!cal) return false // no base calendar, not active
+  if (dateStr < cal.start_date || dateStr > cal.end_date) return false
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  return cal[dayNames[date.getDay()]]
+}

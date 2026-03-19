@@ -4,6 +4,7 @@ import { useDatasets } from '../hooks/useNap'
 import { Header } from '../components/layout/Header'
 import {
   parseGtfsZip, routeColor, routeTypeName, formatDate, calendarDaysLabel, headwayLabel,
+  formatGtfsDate, getExceptionsForDate, isServiceActive,
   type GtfsData, type GtfsRoute, type GtfsTrip,
 } from '../lib/gtfsParser'
 import { downloadGtfsZip } from '../lib/napClient'
@@ -36,12 +37,14 @@ function isGtfs(f: FicheroDto): boolean {
 
 const TRIPS_PAGE_SIZE = 25
 
-// Returns HH:MM from a GTFS time string (which can be 25:30:00 for overnight)
+// Returns HH:MM from a GTFS time string. Returns '' for overnight trips (h >= 24)
+// so that callers can skip them from "today's" list rather than silently wrapping.
 function normalizeTime(t: string): string {
   if (!t) return ''
   const parts = t.split(':')
-  const h = parseInt(parts[0] ?? '0', 10) % 24
-  return `${String(h).padStart(2, '0')}:${parts[1] ?? '00'}`
+  const rawH = parseInt(parts[0] ?? '0', 10)
+  if (rawH >= 24) return '' // overnight trip — belongs to next calendar day
+  return `${String(rawH).padStart(2, '0')}:${parts[1] ?? '00'}`
 }
 
 // Current local time as HH:MM
@@ -49,6 +52,24 @@ function nowHHMM(): string {
   const n = new Date()
   return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`
 }
+
+// Check if a Date is today (ignoring time)
+function isToday(d: Date): boolean {
+  const n = new Date()
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
+}
+
+// Get the Monday of the week containing d (Spanish convention: week starts Monday)
+function getWeekMonday(d: Date): Date {
+  const copy = new Date(d)
+  const day = copy.getDay() // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day
+  copy.setDate(copy.getDate() + diff)
+  copy.setHours(0, 0, 0, 0)
+  return copy
+}
+
+const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 // ── Helpers UI ────────────────────────────────────────────────────────────────
 function Badge({ children, color }: { children: React.ReactNode; color: string }) {
@@ -105,6 +126,13 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
   const [tripSearch, setTripSearch] = useState('')
   const [tripPage, setTripPage] = useState(0)
 
+  // Selected date for schedule filtering (defaults to today)
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  })
+
   // Mobile: panel visibility
   const [leftOpen, setLeftOpen] = useState(false)
   const [rightOpen, setRightOpen] = useState(false)
@@ -148,6 +176,7 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
     setTripSearch('')
     setTripPage(0)
     setLeftOpen(false)
+    setSelectedDate(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })
 
     try {
       const zipBuffer = await downloadGtfsZip(item.fichero.ficheroId)
@@ -238,17 +267,20 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
     return base.filter((s) => s.stop_name.toLowerCase().includes(q) || (s.stop_code ?? '').toLowerCase().includes(q))
   }, [stopsToShow, gtfs, selectedRoute, stopSearch])
 
-  // Trips de la ruta seleccionada — TODOS, con search + paginación
+  // Trips de la ruta seleccionada — filtrados por fecha seleccionada + búsqueda + paginación
   const allTripsForRoute = useMemo(() => {
     if (!gtfs || !selectedRoute) return []
     const trips = gtfs.tripsByRouteId.get(selectedRoute.route_id) ?? []
+    const active = trips.filter(t =>
+      isServiceActive(t.service_id, selectedDate, gtfs.calendarByServiceId, gtfs.calendarDatesByServiceId)
+    )
     const firstDep = (trip: GtfsTrip) => {
       const times = gtfs.stopTimesByTripId.get(trip.trip_id) ?? []
       const sorted = [...times].sort((a, b) => a.stop_sequence - b.stop_sequence)
       return sorted[0]?.departure_time ?? ''
     }
-    return [...trips].sort((a, b) => firstDep(a).localeCompare(firstDep(b)))
-  }, [gtfs, selectedRoute])
+    return [...active].sort((a, b) => firstDep(a).localeCompare(firstDep(b)))
+  }, [gtfs, selectedRoute, selectedDate])
 
   const filteredTrips = useMemo(() => {
     if (!tripSearch) return allTripsForRoute
@@ -268,22 +300,22 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
   const tripTotalPages = Math.max(1, Math.ceil(filteredTrips.length / TRIPS_PAGE_SIZE))
   const pagedTrips = filteredTrips.slice(tripPage * TRIPS_PAGE_SIZE, (tripPage + 1) * TRIPS_PAGE_SIZE)
 
-  // Próximas salidas hoy (cuando no hay trip seleccionado y hay datos)
+  // Próximas salidas / salidas del día (cuando no hay trip seleccionado y hay datos)
   const proximasSalidas = useMemo(() => {
     if (!gtfs || !selectedRoute || selectedTrip) return []
-    const now = nowHHMM()
-    const trips = gtfs.tripsByRouteId.get(selectedRoute.route_id) ?? []
+    const now = isToday(selectedDate) ? nowHHMM() : '00:00'
     const withDep: { trip: GtfsTrip; dep: string }[] = []
-    for (const trip of trips) {
+    for (const trip of allTripsForRoute) {
       const times = gtfs.stopTimesByTripId.get(trip.trip_id) ?? []
       const sorted = [...times].sort((a, b) => a.stop_sequence - b.stop_sequence)
       const dep = sorted[0]?.departure_time
       if (!dep) continue
       const norm = normalizeTime(dep)
+      if (!norm) continue
       if (norm >= now) withDep.push({ trip, dep: norm })
     }
     return withDep.sort((a, b) => a.dep.localeCompare(b.dep)).slice(0, 10)
-  }, [gtfs, selectedRoute, selectedTrip])
+  }, [gtfs, selectedRoute, selectedTrip, selectedDate, allTripsForRoute])
 
   // Horario del trip seleccionado
   const scheduleRows = useMemo(() => {
@@ -320,12 +352,28 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
     return gtfs.calendarDatesByServiceId.get(selectedTrip.service_id) ?? []
   }, [gtfs, selectedTrip])
 
+  // Exception banners for the selected route on the selected date
+  const routeExceptions = useMemo(() => {
+    if (!gtfs || !selectedRoute) return { added: false, removed: false }
+    const trips = gtfs.tripsByRouteId.get(selectedRoute.route_id) ?? []
+    const serviceIds = [...new Set(trips.map(t => t.service_id))]
+    let added = false, removed = false
+    for (const sid of serviceIds) {
+      const excs = getExceptionsForDate(sid, selectedDate, gtfs.calendarDatesByServiceId)
+      for (const exc of excs) {
+        if (exc.exception_type === 1) added = true
+        if (exc.exception_type === 2) removed = true
+      }
+    }
+    return { added, removed }
+  }, [gtfs, selectedRoute, selectedDate])
+
   const mapCenter: [number, number] = gtfs && gtfs.stops.length > 0
     ? [gtfs.stops[0].stop_lat, gtfs.stops[0].stop_lon]
     : [40.416775, -3.70379]
 
-  // Reset page when search changes
-  useEffect(() => { setTripPage(0) }, [tripSearch, selectedRoute])
+  // Reset page when search/route/date changes
+  useEffect(() => { setTripPage(0) }, [tripSearch, selectedRoute, selectedDate])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -688,6 +736,71 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
                   </div>
                 ) : (
                   <>
+                    {/* ── Selector de semana ── */}
+                    <div className="flex-shrink-0 border-b border-slate-100 px-2 py-2 bg-slate-50">
+                      <div className="flex items-center gap-1 mb-1">
+                        <button
+                          onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })}
+                          className="p-1 rounded hover:bg-slate-200 text-slate-500 transition-colors"
+                          aria-label="Semana anterior"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        </button>
+                        <div className="flex gap-0.5 flex-1">
+                          {Array.from({ length: 7 }, (_, i) => {
+                            const monday = getWeekMonday(selectedDate)
+                            const day = new Date(monday)
+                            day.setDate(monday.getDate() + i)
+                            const isActive = formatGtfsDate(day) === formatGtfsDate(selectedDate)
+                            const isTodayDay = isToday(day)
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => setSelectedDate(new Date(day))}
+                                className={`flex-1 flex flex-col items-center py-1 rounded text-[10px] transition-colors ${
+                                  isActive
+                                    ? 'bg-nap-blue text-white'
+                                    : isTodayDay
+                                    ? 'bg-blue-50 text-nap-blue border border-blue-200'
+                                    : 'text-slate-500 hover:bg-slate-200'
+                                }`}
+                              >
+                                <span>{DAY_LABELS[i]}</span>
+                                <span className="font-semibold">{day.getDate()}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <button
+                          onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })}
+                          className="p-1 rounded hover:bg-slate-200 text-slate-500 transition-colors"
+                          aria-label="Semana siguiente"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                      </div>
+                      {!isToday(selectedDate) && (
+                        <button
+                          onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setSelectedDate(d) }}
+                          className="text-[10px] text-nap-blue hover:underline"
+                        >
+                          Hoy
+                        </button>
+                      )}
+                    </div>
+
+                    {/* ── Banners de excepciones ── */}
+                    {routeExceptions.removed && (
+                      <div className="mx-2 mt-1.5 px-2 py-1.5 bg-red-50 border border-red-200 rounded-lg text-[10px] text-red-700 flex items-center gap-1 flex-shrink-0">
+                        <span>⚠</span> Servicio cancelado este día
+                      </div>
+                    )}
+                    {routeExceptions.added && (
+                      <div className="mx-2 mt-1.5 px-2 py-1.5 bg-green-50 border border-green-200 rounded-lg text-[10px] text-green-700 flex items-center gap-1 flex-shrink-0">
+                        <span>+</span> Servicio adicional este día
+                      </div>
+                    )}
+
                     {/* ── Trip selector con búsqueda y paginación ── */}
                     <div className="flex-shrink-0 border-b border-slate-100">
                       {/* Header de la ruta */}
@@ -697,7 +810,7 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
                           {selectedRoute.route_short_name && <span className="mr-1">[{selectedRoute.route_short_name}]</span>}
                           {selectedRoute.route_long_name || selectedRoute.route_id}
                         </span>
-                        <span className="text-[10px] text-slate-400 flex-shrink-0">{allTripsForRoute.length} viajes</span>
+                        <span className="text-[10px] text-slate-400 flex-shrink-0">{allTripsForRoute.length} viajes activos</span>
                       </div>
 
                       {/* Búsqueda de viajes */}
@@ -715,7 +828,7 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
                       {proximasSalidas.length > 0 && !selectedTrip && !tripSearch && (
                         <div className="px-2 pb-2">
                           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1 flex items-center gap-1">
-                            <span>🕐</span> Próximas salidas hoy
+                            {isToday(selectedDate) ? <><span>🕐</span> Próximas salidas hoy</> : <><span>🗓</span> Salidas del día</>}
                           </p>
                           <div className="flex flex-wrap gap-1">
                             {proximasSalidas.map(({ trip, dep }) => (
@@ -935,6 +1048,53 @@ export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void
                         </div>
                       ))}
                     </div>
+                  </section>
+                )}
+
+                {/* Calendario de servicio */}
+                {(gtfs.calendar.length > 0 || gtfs.calendarDates.length > 0) && (
+                  <section>
+                    <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Calendario de servicio
+                    </h4>
+                    {gtfs.calendar.length > 0 ? (
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {gtfs.calendar.map((c) => {
+                          const days = [
+                            c.monday && 'L', c.tuesday && 'M', c.wednesday && 'X',
+                            c.thursday && 'J', c.friday && 'V', c.saturday && 'S', c.sunday && 'D',
+                          ].filter(Boolean) as string[]
+                          const start = new Date(
+                            parseInt(c.start_date.slice(0, 4)),
+                            parseInt(c.start_date.slice(4, 6)) - 1,
+                            parseInt(c.start_date.slice(6, 8))
+                          )
+                          const end = new Date(
+                            parseInt(c.end_date.slice(0, 4)),
+                            parseInt(c.end_date.slice(4, 6)) - 1,
+                            parseInt(c.end_date.slice(6, 8))
+                          )
+                          const totalDays = Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+                          return (
+                            <div key={c.service_id} className="bg-slate-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1 flex-wrap mb-1">
+                                {days.map(d => (
+                                  <span key={d} className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{d}</span>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-slate-500">{formatDate(c.start_date)} – {formatDate(c.end_date)}</p>
+                              <p className="text-[10px] text-slate-400">{totalDays} días en el rango · service_id: {c.service_id}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 rounded-lg p-2.5">
+                        <p className="text-[10px] text-slate-500">
+                          Servicio por fechas específicas — {gtfs.calendarDates.length} fechas registradas
+                        </p>
+                      </div>
+                    )}
                   </section>
                 )}
 
