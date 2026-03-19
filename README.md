@@ -136,6 +136,81 @@ Vercel detecta automáticamente la configuración de Vite y aplica `vercel.json`
 
 ---
 
+## ⚖️ Aviso legal y licencia de datos
+
+**Esta es una herramienta de visualización no oficial.** No está afiliada, patrocinada ni respaldada por el Ministerio de Transportes y Movilidad Sostenible (MITRAMS) ni por el Punto de Acceso Nacional (NAP).
+
+Los datos mostrados en este dashboard son propiedad del **Ministerio de Transportes y Movilidad Sostenible de España** y se publican bajo la [Licencia de Datos Abiertos MITRAMS](https://nap.transportes.gob.es/licencia-datos). Esta herramienta los consume a través de la API pública del NAP respetando sus [condiciones de uso](https://nap.transportes.gob.es/condiciones-uso).
+
+**Lo que esto implica:**
+
+- El uso de los datos es responsabilidad exclusiva del usuario. Esta herramienta no asume ninguna responsabilidad sobre la exactitud, integridad o vigencia de los datos mostrados.
+- Los datos se ofrecen *tal y como están* en la fuente original. El MITRAMS no garantiza que todos los datos sean estrictamente correctos, y tampoco lo hace este dashboard.
+- No se puede garantizar la disponibilidad continua del servicio, ya que depende de la API pública del NAP.
+- Cualquier uso comercial o redistribución de los datos debe cumplir con la licencia MITRAMS, que exige citar la fuente y no desnaturalizar la información.
+
+> **Powered by MITRAMS** — Fuente original: [nap.transportes.gob.es](https://nap.transportes.gob.es)
+
+---
+
+## 🤖 ¿Cómo se construyó este programa?
+
+Este proyecto fue desarrollado íntegramente mediante un **sistema multi-agente de inteligencia artificial**, sin escribir código manualmente. Funciona como una demostración real de lo que es posible con la orquestación de agentes de IA en 2025–2026.
+
+### El sistema: Ntizar Brain
+
+La herramienta utilizada es **Ntizar Brain**, un sistema operativo de inteligencia construido sobre [Obsidian](https://obsidian.md) y [OpenCode](https://opencode.ai). No es un chatbot: es un pipeline de agentes especializados que se activan en secuencia según el tipo de tarea.
+
+### Los agentes que participaron
+
+Cada ciclo de desarrollo siguió el mismo flujo de agentes, en orden:
+
+| Agente | Rol | Lo que hizo en este proyecto |
+|--------|-----|------------------------------|
+| **Classifier** | Detecta el tipo de tarea y diseña el flujo | Identificó si cada petición era feature nueva, bug, refactoring o documentación |
+| **Explorer** | Lee y analiza el contexto existente sin modificar nada | Leyó el código antes de cada cambio para entender la arquitectura actual |
+| **Planner** | Diseña la estrategia y los pasos concretos | Decidió el orden de implementación de cada bloque (A, B, C en cada ciclo) |
+| **Spec Writer** | Genera una especificación ejecutable y verificable | Produjo las tablas de spec (D1–D12) que se aprobaron antes de codificar |
+| **Implementer** | Ejecuta la spec en el código real | Escribió todo el código: TypeScript, React, Tailwind, funciones serverless |
+| **Reviewer** | Valida calidad y coherencia del output | Detectó los CRITICALs y WARNINGs antes de cada commit (ej: grid responsive, normalizeTime) |
+| **Critic** | Busca fallos que el reviewer no vio | Segunda pasada de revisión en cambios de alto impacto |
+| **Synthesizer** | Resume y comunica resultados | Generó los resúmenes de ciclo que se presentaron al humano |
+| **Archiver** | Destila aprendizaje permanente | Documentó en el sistema las lecciones clave (ej: S3 del NAP, tsconfig en Vercel) |
+
+### El ciclo de trabajo
+
+```
+Humano da la tarea
+      ↓
+CLASSIFY → EXPLORE → PLAN → SPEC
+                               ↓
+                    Humano aprueba la spec ✅
+                               ↓
+                    IMPLEMENT → REVIEW → CRITIC
+                               ↓
+                    SYNTHESIZE → (Humano aprueba ✅)
+                               ↓
+                           ARCHIVE
+```
+
+El humano solo interviene en dos puntos: **aprobar la spec** antes de que se empiece a codificar, y **aprobar el resultado** antes de que se archive el aprendizaje. Todo lo demás lo ejecutan los agentes.
+
+### Lo que se construyó en esta sesión
+
+En una sola sesión de trabajo se completaron:
+
+- **4 ciclos de desarrollo** (v1.0 → v1.4.0)
+- **8 ficheros creados o modificados** en profundidad
+- **~2.500 líneas de código** TypeScript/React escritas o refactorizadas
+- **1 sistema de parsing GTFS** propio con soporte de encoding, tolerancia a errores, calendarios y excepciones
+- **1 proxy serverless** en Vercel con whitelist de seguridad
+- **Responsive completo** para móvil y escritorio
+- **Deploy en producción** con corrección de bugs en tiempo real
+
+Todo esto sin escribir una sola línea de código manualmente.
+
+---
+
 ## 📋 Changelog
 
 ### v1.4.0 (2026-03-19) — Calendario semanal y excepciones de servicio en el GTFS Viewer

@@ -119,7 +119,28 @@ export function Sidebar({ open = true, onClose }: SidebarProps) {
           </svg>
           Cambiar API key
         </button>
-        <p className="text-[10px] text-slate-300 leading-tight pt-1">
+
+        {/* Aviso legal */}
+        <div className="pt-1 border-t border-slate-100 space-y-1">
+          <p className="text-[9px] text-slate-300 leading-tight">
+            Visualizador no oficial. Los datos pertenecen al{' '}
+            <a href="https://www.transportes.gob.es" target="_blank" rel="noopener noreferrer" className="hover:underline text-slate-400">
+              Ministerio de Transportes y Movilidad Sostenible
+            </a>
+            {' '}y se publican bajo la{' '}
+            <a href="https://nap.transportes.gob.es/licencia-datos" target="_blank" rel="noopener noreferrer" className="hover:underline text-slate-400">
+              Licencia de Datos Abiertos MITRAMS
+            </a>
+            . Esta herramienta no está afiliada ni respaldada por el MITRAMS.
+            El uso de los datos es responsabilidad exclusiva del usuario. Consulta las{' '}
+            <a href="https://nap.transportes.gob.es/condiciones-uso" target="_blank" rel="noopener noreferrer" className="hover:underline text-slate-400">
+              condiciones de uso
+            </a>
+            {' '}del NAP. <span className="italic">Powered by MITRAMS.</span>
+          </p>
+        </div>
+
+        <p className="text-[10px] text-slate-300 leading-tight">
           Por <span className="text-slate-400 font-medium">David Antizar</span> · Mastermind
         </p>
       </div>
