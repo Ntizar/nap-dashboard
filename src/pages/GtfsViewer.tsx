@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Polyline, Popup, useMap } from '
 import { useDatasets } from '../hooks/useNap'
 import { Header } from '../components/layout/Header'
 import { parseGtfsZip, routeColor, routeTypeName, type GtfsData, type GtfsRoute } from '../lib/gtfsParser'
-import { useApiKey } from '../context/ApiKeyContext'
+import { downloadGtfsZip } from '../lib/napClient'
 import type { ConjuntoDatos, FicheroDto } from '../lib/types'
 import 'leaflet/dist/leaflet.css'
 
@@ -50,7 +50,6 @@ function getBadgeClass(type: number): string {
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function GtfsViewer() {
   const { data: response, isLoading: loadingCatalog } = useDatasets()
-  const { apiKey } = useApiKey()
 
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<SelectedFile | null>(null)
@@ -89,38 +88,7 @@ export default function GtfsViewer() {
     setSelectedRoute(null)
 
     try {
-      // 1. Obtener URL de descarga
-      const linkRes = await fetch(`/api/nap/Fichero/downloadLink/${item.fichero.ficheroId}`, {
-        headers: { 'X-Api-Key': apiKey ?? '' },
-      })
-      if (!linkRes.ok) throw new Error(`Error obteniendo link: ${linkRes.status}`)
-      const downloadUrl: string = await linkRes.json()
-
-      // 2. Descargar el ZIP (puede ser una URL externa directa)
-      let zipBuffer: ArrayBuffer
-      if (downloadUrl.startsWith('http')) {
-        // URL externa — la descargamos via proxy para añadir la key si hace falta
-        const proxyUrl = `/api/nap/gtfs-download?url=${encodeURIComponent(downloadUrl)}`
-        const zipRes = await fetch(proxyUrl, {
-          headers: { 'X-Api-Key': apiKey ?? '' },
-        })
-        if (!zipRes.ok) {
-          // Si el proxy no funciona, intentar directo (puede que la URL sea pública)
-          const directRes = await fetch(downloadUrl)
-          if (!directRes.ok) throw new Error(`Error descargando GTFS: ${directRes.status}`)
-          zipBuffer = await directRes.arrayBuffer()
-        } else {
-          zipBuffer = await zipRes.arrayBuffer()
-        }
-      } else {
-        const zipRes = await fetch(`/api/nap/${downloadUrl}`, {
-          headers: { 'X-Api-Key': apiKey ?? '' },
-        })
-        if (!zipRes.ok) throw new Error(`Error descargando GTFS: ${zipRes.status}`)
-        zipBuffer = await zipRes.arrayBuffer()
-      }
-
-      // 3. Parsear
+      const zipBuffer = await downloadGtfsZip(item.fichero.ficheroId)
       const data = parseGtfsZip(zipBuffer)
       setGtfs(data)
       setBoundsKey((k) => k + 1)
@@ -130,7 +98,7 @@ export default function GtfsViewer() {
     } finally {
       setLoading(false)
     }
-  }, [apiKey])
+  }, [])
 
   // Shapes a dibujar — si hay ruta seleccionada, solo sus shapes; si no, todas (max 30 para rendimiento)
   const shapesToDraw = useMemo(() => {

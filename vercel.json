@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/nap/gtfs-proxy",
+      "destination": "/api/nap/gtfs-proxy"
+    },
+    {
       "source": "/api/nap/:path*",
       "destination": "/api/nap/proxy"
     }

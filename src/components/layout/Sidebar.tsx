@@ -62,6 +62,11 @@ export function Sidebar() {
         >
           Cambiar API key
         </button>
+        <p className="text-xs text-slate-600 pt-1 leading-tight">
+          Hecho por{' '}
+          <span className="text-slate-400 font-medium">David Antizar</span>
+          {' '}con su Mastermind
+        </p>
       </div>
     </aside>
   )

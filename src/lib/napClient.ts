@@ -51,8 +51,22 @@ export const filterDatasets = (body: FilterBody) =>
     body: JSON.stringify(body),
   })
 
-export const getDownloadLink = (ficheroId: number) =>
-  napFetch<string>(`Fichero/downloadLink/${ficheroId}`)
+/**
+ * Devuelve la URL de descarga de un fichero.
+ * El NAP responde con texto plano (no JSON), así que leemos .text() directamente.
+ */
+export async function getDownloadLink(ficheroId: number): Promise<string> {
+  const res = await fetch(`${BASE}/Fichero/downloadLink/${ficheroId}`, {
+    headers: { 'X-Api-Key': getApiKey() },
+  })
+  if (!res.ok) throw new Error(`NAP API ${res.status} — downloadLink/${ficheroId}`)
+  const text = await res.text()
+  // El proxy puede devolver JSON string o texto plano — normalizamos ambos
+  if (text.startsWith('"') && text.endsWith('"')) {
+    return JSON.parse(text) as string
+  }
+  return text.trim()
+}
 
 // ── Catálogos ────────────────────────────────────────────────────────────────
 
@@ -74,21 +88,40 @@ export const getOperators = () =>
 // ── GTFS ─────────────────────────────────────────────────────────────────────
 
 /**
- * Descarga el ZIP de un fichero GTFS.
+ * Descarga el ZIP de un fichero GTFS dado su ID.
+ *
+ * Flujo:
+ *   1. Pide la URL de descarga a NAP (respuesta texto plano)
+ *   2. Si la URL es externa, la descarga via /api/nap/gtfs-proxy para evitar CORS
+ *   3. Si es relativa, la pide directamente al proxy NAP
+ *
  * Devuelve el ArrayBuffer crudo para parsear con fflate en el cliente.
  */
 export async function downloadGtfsZip(ficheroId: number): Promise<ArrayBuffer> {
-  // Primero obtenemos la URL de descarga
   const downloadUrl = await getDownloadLink(ficheroId)
+  return fetchGtfsZipByUrl(downloadUrl)
+}
 
-  // La URL puede ser directa o relativa al proxy
-  const url = downloadUrl.startsWith('http')
-    ? `/api/nap/gtfs-proxy?url=${encodeURIComponent(downloadUrl)}`
-    : `${BASE}/${downloadUrl}`
+/**
+ * Descarga un ZIP GTFS desde una URL concreta (externa o relativa).
+ * Usar cuando ya se tiene la URL (p.ej. desde el viewer que guarda la selección).
+ */
+export async function fetchGtfsZipByUrl(downloadUrl: string): Promise<ArrayBuffer> {
+  let fetchUrl: string
+  const headers: Record<string, string> = { 'X-Api-Key': getApiKey() }
 
-  const res = await fetch(url, {
-    headers: { 'X-Api-Key': getApiKey() },
-  })
-  if (!res.ok) throw new Error(`GTFS download ${res.status}`)
+  if (downloadUrl.startsWith('http')) {
+    // URL externa → pasar por el proxy server-side para evitar CORS
+    fetchUrl = `${BASE}/gtfs-proxy?url=${encodeURIComponent(downloadUrl)}`
+  } else {
+    // Ruta relativa → añadir base del proxy NAP
+    fetchUrl = `${BASE}/${downloadUrl.replace(/^\//, '')}`
+  }
+
+  const res = await fetch(fetchUrl, { headers })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Error descargando GTFS (${res.status})${body ? ': ' + body : ''}`)
+  }
   return res.arrayBuffer()
 }

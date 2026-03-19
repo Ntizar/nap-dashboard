@@ -64,10 +64,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(upstream.status).send(Buffer.from(buffer))
     }
 
-    const data = contentType.includes('application/json')
-      ? await upstream.json()
-      : await upstream.text()
+    // Texto plano (ej. URL de descarga devuelta por downloadLink)
+    if (!contentType.includes('application/json')) {
+      const text = await upstream.text()
+      res.setHeader('Content-Type', 'text/plain')
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
+      return res.status(upstream.status).send(text)
+    }
 
+    const data = await upstream.json()
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
     return res.status(upstream.status).json(data)

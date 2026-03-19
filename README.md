@@ -100,3 +100,7 @@ Vercel detecta automáticamente la configuración de Vite y aplica `vercel.json`
 ## Datos y licencia
 
 Los datos son publicados por el Ministerio de Transportes, Movilidad y Agenda Urbana de España bajo la licencia abierta del NAP. El código de este dashboard es de uso libre.
+
+---
+
+Hecho por **David Antizar** con su Mastermind.
