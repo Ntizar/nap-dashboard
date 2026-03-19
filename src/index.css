@@ -1,6 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-/* Reset base para que Tailwind controle el layout */
+/* ── Variables de color NAP ────────────────────────────────────────────────── */
+:root {
+  --nap-blue: #1a56a0;
+  --nap-blue-light: #2b6cb0;
+  --nap-blue-dark: #0f3460;
+  --nap-orange: #e87722;
+  --nap-yellow: #f5a623;
+  --nap-teal: #00a896;
+  --nap-bg: #f4f6f8;
+  --nap-text: #1a202c;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -9,13 +22,49 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background-color: var(--nap-bg);
+  color: var(--nap-text);
 }
 
-/* Fix para que el mapa de Leaflet no tenga tiles rotos */
+/* ── Tailwind custom colors (utility classes) ─────────────────────────────── */
+.text-nap-blue   { color: var(--nap-blue); }
+.bg-nap-blue     { background-color: var(--nap-blue); }
+.border-nap-blue { border-color: var(--nap-blue); }
+.ring-nap-blue   { --tw-ring-color: var(--nap-blue); }
+.focus\:ring-nap-blue:focus { --tw-ring-color: var(--nap-blue); }
+
+/* ── Scrollbar minimalista ─────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5e0;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #a0aec0;
+}
+
+/* ── Leaflet ───────────────────────────────────────────────────────────────── */
 .leaflet-container {
   height: 100%;
   width: 100%;
   z-index: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px;
 }
