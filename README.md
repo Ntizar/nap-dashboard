@@ -155,59 +155,121 @@ Los datos mostrados en este dashboard son propiedad del **Ministerio de Transpor
 
 ## 🤖 ¿Cómo se construyó este programa?
 
-Este proyecto fue desarrollado íntegramente mediante un **sistema multi-agente de inteligencia artificial**, sin escribir código manualmente. Funciona como una demostración real de lo que es posible con la orquestación de agentes de IA en 2025–2026.
+> **Spoiler: no se escribió ni una sola línea de código manualmente.**
 
-### El sistema: Ntizar Brain
+Este proyecto es la demostración práctica de un método de trabajo que David Antizar lleva desarrollando durante meses: construir software complejo usando un sistema propio de inteligencia artificial multi-agente, sin tocar el teclado para programar.
 
-La herramienta utilizada es **Ntizar Brain**, un sistema operativo de inteligencia construido sobre [Obsidian](https://obsidian.md) y [OpenCode](https://opencode.ai). No es un chatbot: es un pipeline de agentes especializados que se activan en secuencia según el tipo de tarea.
+---
 
-### Los agentes que participaron
+### 🧠 Qué es el Mastermind
 
-Cada ciclo de desarrollo siguió el mismo flujo de agentes, en orden:
+El **Mastermind** es el nombre que David da a su sistema personal de trabajo con IA. No es una herramienta de terceros ni un producto comercial: es una arquitectura que él ha diseñado y construido para sí mismo, que combina:
 
-| Agente | Rol | Lo que hizo en este proyecto |
-|--------|-----|------------------------------|
-| **Classifier** | Detecta el tipo de tarea y diseña el flujo | Identificó si cada petición era feature nueva, bug, refactoring o documentación |
-| **Explorer** | Lee y analiza el contexto existente sin modificar nada | Leyó el código antes de cada cambio para entender la arquitectura actual |
-| **Planner** | Diseña la estrategia y los pasos concretos | Decidió el orden de implementación de cada bloque (A, B, C en cada ciclo) |
-| **Spec Writer** | Genera una especificación ejecutable y verificable | Produjo las tablas de spec (D1–D12) que se aprobaron antes de codificar |
-| **Implementer** | Ejecuta la spec en el código real | Escribió todo el código: TypeScript, React, Tailwind, funciones serverless |
-| **Reviewer** | Valida calidad y coherencia del output | Detectó los CRITICALs y WARNINGs antes de cada commit (ej: grid responsive, normalizeTime) |
-| **Critic** | Busca fallos que el reviewer no vio | Segunda pasada de revisión en cambios de alto impacto |
-| **Synthesizer** | Resume y comunica resultados | Generó los resúmenes de ciclo que se presentaron al humano |
-| **Archiver** | Destila aprendizaje permanente | Documentó en el sistema las lecciones clave (ej: S3 del NAP, tsconfig en Vercel) |
+- **Obsidian** como sistema nervioso central — toda la memoria, contexto, aprendizajes y documentación del proyecto viven aquí en ficheros Markdown enlazados entre sí
+- **OpenCode** como motor de ejecución — el agente de IA que lee el contexto, razona y ejecuta acciones reales (leer ficheros, escribir código, lanzar comandos, hacer commits)
+- **Un protocolo de agentes** diseñado por David que define cómo deben pensar y actuar los distintos roles
 
-### El ciclo de trabajo
+La idea central es simple pero poderosa: **el humano define qué quiere, el sistema decide cómo hacerlo y lo ejecuta**. David no programa. David dirige.
+
+---
+
+### 🏗️ Qué es Ntizar Brain
+
+**Ntizar Brain** es la instancia concreta del Mastermind que vive en el sistema de David. Es su cerebro operativo personal: un conjunto de ficheros en Obsidian que definen exactamente cómo se comporta el sistema, qué agentes existen, qué reglas siguen y qué han aprendido en sesiones anteriores.
+
+Dentro de Ntizar Brain hay tres tipos de contenido:
+
+| Tipo | Qué contiene |
+|------|-------------|
+| **Agentes** (`agents/`) | Los 10 ficheros que definen el rol, las reglas y el comportamiento de cada agente del sistema |
+| **Estado** (`agents/state/`) | La configuración del sistema y el estado de la sesión actual — qué se está construyendo, en qué fase está, qué decisiones se han tomado |
+| **Skills y templates** (`agents/skills/`, `agents/templates/`) | Conocimiento reutilizable destilado de sesiones anteriores — cómo hacer un deploy en Vercel, cómo estructurar un parser GTFS, cómo manejar CORS, etc. |
+
+Cada vez que David empieza una sesión, el sistema lee su propio estado y continúa desde donde lo dejó. No hay pérdida de contexto entre sesiones.
+
+---
+
+### 👥 Los 10 agentes del sistema
+
+El sistema no tiene un único agente que "hace todo". Tiene 10 agentes especializados que se activan en secuencia, cada uno con una responsabilidad clara y delimitada:
+
+| # | Agente | Su único trabajo |
+|---|--------|-----------------|
+| 0 | **Orchestrator** | Lee el estado del sistema al inicio de cada sesión y coordina qué agentes se activan |
+| 1 | **Classifier** | Recibe la petición del humano y decide qué tipo de tarea es y qué agentes necesita |
+| 2 | **Explorer** | Lee código, ficheros y contexto existente. **Nunca modifica nada.** Solo entiende |
+| 3 | **Planner** | Con el contexto del Explorer, diseña la estrategia: qué se hace, en qué orden, por qué |
+| 4 | **Spec Writer** | Convierte el plan en una especificación técnica concreta, verificable y aprobable por el humano |
+| 5 | **Implementer** | Con la spec aprobada, escribe el código real. No decide qué hacer — solo ejecuta la spec |
+| 6 | **Reviewer** | Revisa el código del Implementer buscando bugs, inconsistencias y problemas de calidad |
+| 7 | **Critic** | Segunda revisión más agresiva. Busca lo que el Reviewer no vio. Se activa en cambios críticos |
+| 8 | **Synthesizer** | Resume lo que se hizo, en lenguaje claro, para presentárselo al humano |
+| 9 | **Archiver** | Tras la aprobación humana, extrae los aprendizajes de la sesión y los persiste en el sistema |
+
+La separación de roles es deliberada. El Implementer no puede tomar decisiones de arquitectura — eso es del Planner. El Reviewer no puede modificar código — solo señalar problemas. Cada agente hace una sola cosa y la hace bien.
+
+---
+
+### 🔄 El ciclo de trabajo exacto
+
+Así fue exactamente cómo se construyó este dashboard:
 
 ```
-Humano da la tarea
-      ↓
-CLASSIFY → EXPLORE → PLAN → SPEC
-                               ↓
-                    Humano aprueba la spec ✅
-                               ↓
-                    IMPLEMENT → REVIEW → CRITIC
-                               ↓
-                    SYNTHESIZE → (Humano aprueba ✅)
-                               ↓
-                           ARCHIVE
+David escribe en lenguaje natural lo que quiere
+              ↓
+    CLASSIFIER → identifica el tipo de tarea
+              ↓
+    EXPLORER → lee el código existente sin tocar nada
+              ↓
+    PLANNER → diseña la estrategia
+              ↓
+    SPEC WRITER → genera especificación técnica
+
+              ⏸ David revisa y aprueba la spec ✅
+              ↓
+    IMPLEMENTER → escribe todo el código
+              ↓
+    REVIEWER → detecta bugs y problemas
+              ↓
+    CRITIC → segunda revisión
+              ↓
+    SYNTHESIZER → resume el resultado para David
+
+              ⏸ David aprueba el resultado ✅
+              ↓
+    ARCHIVER → guarda los aprendizajes en Ntizar Brain
 ```
 
-El humano solo interviene en dos puntos: **aprobar la spec** antes de que se empiece a codificar, y **aprobar el resultado** antes de que se archive el aprendizaje. Todo lo demás lo ejecutan los agentes.
+David interviene **exactamente dos veces** por ciclo: para aprobar la spec antes de que se empiece a codificar, y para aprobar el resultado antes de que se archive. Todo lo demás ocurre sin su intervención.
 
-### Lo que se construyó en esta sesión
+---
 
-En una sola sesión de trabajo se completaron:
+### 📊 Lo que produjo el sistema en esta sesión
 
-- **4 ciclos de desarrollo** (v1.0 → v1.4.0)
-- **8 ficheros creados o modificados** en profundidad
-- **~2.500 líneas de código** TypeScript/React escritas o refactorizadas
-- **1 sistema de parsing GTFS** propio con soporte de encoding, tolerancia a errores, calendarios y excepciones
-- **1 proxy serverless** en Vercel con whitelist de seguridad
-- **Responsive completo** para móvil y escritorio
-- **Deploy en producción** con corrección de bugs en tiempo real
+Una sola sesión de trabajo, con conversación en lenguaje natural, produjo:
 
-Todo esto sin escribir una sola línea de código manualmente.
+| Métrica | Resultado |
+|---------|-----------|
+| Ciclos completados | 4 (v1.0 → v1.4.0) |
+| Ficheros creados o modificados en profundidad | 8 |
+| Líneas de código escritas o refactorizadas | ~2.500 |
+| Bugs detectados y corregidos por el Reviewer/Critic | 6 |
+| Bugs de producción corregidos en tiempo real | 2 (403 S3, TS errors Vercel) |
+| Tiempo de intervención humana directa | ~15 minutos en aprobaciones |
+| Código escrito manualmente por David | **0 líneas** |
+
+---
+
+### 💡 Por qué importa esto
+
+No es un truco. No es "ChatGPT escribe código". Es un método de ingeniería aplicado a la IA:
+
+- **El sistema tiene memoria** — Ntizar Brain recuerda decisiones anteriores, arquitecturas elegidas y bugs ya resueltos
+- **El sistema aprende** — cada sesión deja aprendizajes persistentes que mejoran las siguientes
+- **El sistema tiene responsabilidades separadas** — ningún agente hace todo, lo que elimina alucinaciones y errores de contexto
+- **El humano mantiene el control** — David aprueba cada spec antes de que se ejecute. No hay sorpresas
+
+David no ha abandonado el criterio ni la visión del producto. Ha delegado la ejecución técnica. La diferencia entre un director de cine y un camarógrafo.
 
 ---
 
