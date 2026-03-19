@@ -4,51 +4,44 @@ import { KpiCard } from '../components/cards/KpiCard'
 import { KpiSkeleton, ChartSkeleton } from '../components/cards/Skeleton'
 import { HorizontalBarChart } from '../components/charts/HorizontalBarChart'
 import { DonutChart } from '../components/charts/DonutChart'
+import type { ConjuntoDatos } from '../lib/types'
 
-// Helpers para derivar métricas del array plano que devuelve la API
-function countByField(datasets: Record<string, unknown>[], field: string): { name: string; value: number }[] {
+function countByTransport(datasets: ConjuntoDatos[]) {
   const acc: Record<string, number> = {}
   for (const ds of datasets) {
-    const items = ds[field] as { nombre?: string; id?: number }[] | undefined
-    if (!items) continue
-    for (const item of items) {
-      const key = item.nombre ?? String(item.id ?? '?')
-      acc[key] = (acc[key] ?? 0) + 1
+    for (const t of ds.tiposTransporte ?? []) {
+      acc[t.nombre] = (acc[t.nombre] ?? 0) + 1
     }
   }
   return Object.entries(acc).map(([name, value]) => ({ name, value }))
 }
 
-function countByOrg(datasets: Record<string, unknown>[]): { name: string; value: number }[] {
+function countByOrg(datasets: ConjuntoDatos[]) {
   const acc: Record<string, number> = {}
   for (const ds of datasets) {
-    const org = ds['organizacion'] as { nombre?: string } | undefined
-    const key = org?.nombre ?? 'Sin organización'
+    const key = ds.organizacion?.nombre ?? 'Sin organización'
     acc[key] = (acc[key] ?? 0) + 1
   }
   return Object.entries(acc).map(([name, value]) => ({ name, value }))
 }
 
 export default function Overview() {
-  const { data: datasets, isLoading: loadingDs, isError: errorDs } = useDatasets()
+  const { data: response, isLoading: loadingDs, isError: errorDs } = useDatasets()
   const { data: transportTypes, isLoading: loadingTT } = useTransportTypes()
   const { data: organizations, isLoading: loadingOrg } = useOrganizations()
   const { data: regions, isLoading: loadingReg } = useRegions()
 
-  const ds = (datasets ?? []) as Record<string, unknown>[]
+  const datasets = response?.conjuntosDatoDto ?? []
 
-  const byTransport = countByField(ds, 'tiposTransporte')
-  const byOrg = countByOrg(ds)
+  const byTransport = countByTransport(datasets)
+  const byOrg = countByOrg(datasets)
 
-  // Métricas simples derivadas de los catálogos
-  const totalDatasets = ds.length
-  const totalOperators = ds.reduce((s, d) => {
-    const ops = d['operadores'] as unknown[] | undefined
-    return s + (ops?.length ?? 0)
-  }, 0)
-  const totalOrgs = (organizations as unknown[] | undefined)?.length ?? 0
-  const totalRegions = (regions as unknown[] | undefined)?.length ?? 0
-  const totalTransportTypes = (transportTypes as unknown[] | undefined)?.length ?? 0
+  const totalDatasets = response?.filesNum ?? datasets.length
+  const totalOrgs = organizations?.length ?? 0
+  const totalRegions = regions?.length ?? 0
+  const totalTransportTypes = transportTypes?.length ?? 0
+
+  const isLoading = loadingDs || loadingTT || loadingOrg || loadingReg
 
   if (errorDs) {
     return (
@@ -56,7 +49,7 @@ export default function Overview() {
         <Header title="Resumen" subtitle="Vista general del catálogo de transporte de España" />
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-red-700 text-sm">
-            Error cargando datos. Verifica que la variable de entorno NAP_API_KEY está configurada en Vercel.
+            Error cargando datos. Verifica que la variable de entorno <code>NAP_API_KEY</code> está configurada.
           </div>
         </div>
       </div>
@@ -73,7 +66,7 @@ export default function Overview() {
       <div className="p-6 space-y-6">
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {loadingDs || loadingTT || loadingOrg || loadingReg ? (
+          {isLoading ? (
             Array.from({ length: 4 }).map((_, i) => <KpiSkeleton key={i} />)
           ) : (
             <>
@@ -117,7 +110,6 @@ export default function Overview() {
               <HorizontalBarChart
                 data={byTransport}
                 title="Datasets por tipo de transporte"
-                maxItems={10}
               />
               <HorizontalBarChart
                 data={byOrg}
@@ -138,19 +130,28 @@ export default function Overview() {
           ) : (
             <>
               <DonutChart
-                data={byOrg.slice(0, 10)}
+                data={byOrg}
                 title="Distribución por organización (top 7)"
               />
               <div className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3">Operadores en datasets</h3>
-                <p className="text-5xl font-bold text-blue-700">{totalOperators}</p>
-                <p className="text-sm text-slate-500 mt-2">
-                  Operadores de transporte referenciados en el catálogo
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">Ficheros en el catálogo</h3>
+                <p className="text-5xl font-bold text-blue-700">
+                  {datasets.reduce((s, ds) => s + (ds.ficherosDto?.length ?? 0), 0)}
                 </p>
-                <div className="mt-4 pt-4 border-t border-slate-100">
-                  <p className="text-xs text-slate-400">
-                    Ve a la sección <strong>Operadores</strong> para ver el listado completo.
-                  </p>
+                <p className="text-sm text-slate-500 mt-2">
+                  Total de ficheros descargables (GTFS, NeTEx, etc.)
+                </p>
+                <div className="mt-4 pt-4 border-t border-slate-100 space-y-1">
+                  {['GTFS', 'NeTEx', 'DATEX II', 'SIRI'].map((fmt) => {
+                    const count = datasets.reduce((s, ds) =>
+                      s + (ds.ficherosDto?.filter(f => f.tipoFicheroNombre?.toUpperCase().includes(fmt)).length ?? 0), 0)
+                    return count > 0 ? (
+                      <div key={fmt} className="flex justify-between text-xs text-slate-500">
+                        <span>{fmt}</span>
+                        <span className="font-semibold text-slate-700">{count}</span>
+                      </div>
+                    ) : null
+                  })}
                 </div>
               </div>
             </>

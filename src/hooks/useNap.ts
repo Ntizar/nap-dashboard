@@ -7,8 +7,8 @@ import {
   getOrganizations,
   getOperators,
   filterDatasets,
-  getDownloadLink,
 } from '../lib/napClient'
+import type { FilterBody } from '../lib/types'
 
 const STALE = 5 * 60 * 1000 // 5 minutos
 
@@ -20,12 +20,12 @@ export function useDatasets() {
   })
 }
 
-export function useFilteredDatasets(filter: object) {
+export function useFilteredDatasets(filter: FilterBody, enabled: boolean) {
   return useQuery({
     queryKey: ['datasets', 'filter', filter],
     queryFn: () => filterDatasets(filter),
     staleTime: STALE,
-    enabled: Object.keys(filter).length > 0,
+    enabled,
   })
 }
 
@@ -66,14 +66,5 @@ export function useOperators() {
     queryKey: ['operators'],
     queryFn: getOperators,
     staleTime: STALE,
-  })
-}
-
-export function useDownloadLink(ficheroId: number | null) {
-  return useQuery({
-    queryKey: ['downloadLink', ficheroId],
-    queryFn: () => getDownloadLink(ficheroId!),
-    staleTime: STALE,
-    enabled: ficheroId !== null,
   })
 }

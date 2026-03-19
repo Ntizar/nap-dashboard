@@ -3,21 +3,16 @@ import { useOperators } from '../hooks/useNap'
 import { Header } from '../components/layout/Header'
 import { TableSkeleton } from '../components/cards/Skeleton'
 
-type Operador = Record<string, unknown>
-
 export default function Operadores() {
-  const { data: raw, isLoading, isError } = useOperators()
+  const { data: operators, isLoading, isError } = useOperators()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const PAGE_SIZE = 30
 
-  const operators = (raw ?? []) as Operador[]
-
   const filtered = useMemo(() =>
-    operators.filter((op) => {
-      const nombre = String(op['nombre'] ?? '').toLowerCase()
-      return !search || nombre.includes(search.toLowerCase())
-    }),
+    (operators ?? []).filter((op) =>
+      !search || op.nombre.toLowerCase().includes(search.toLowerCase())
+    ),
     [operators, search]
   )
 
@@ -45,7 +40,6 @@ export default function Operadores() {
       />
 
       <div className="p-6 space-y-4">
-        {/* Buscador */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <input
             type="text"
@@ -56,7 +50,6 @@ export default function Operadores() {
           />
         </div>
 
-        {/* Tabla */}
         {isLoading ? (
           <TableSkeleton rows={12} />
         ) : (
@@ -66,33 +59,39 @@ export default function Operadores() {
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Operador</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">ID</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600">URL</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Datasets asociados</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginated.map((op, i) => {
-                    const conjuntos = (op['conjutosDatos'] as unknown[] | undefined) ?? []
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-800">
-                          {String(op['nombre'] ?? '—')}
-                        </td>
-                        <td className="px-4 py-3 text-slate-400 text-xs font-mono">
-                          {String(op['id'] ?? '—')}
-                        </td>
-                        <td className="px-4 py-3">
-                          {conjuntos.length > 0 ? (
-                            <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                              {conjuntos.length} dataset{conjuntos.length > 1 ? 's' : ''}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 text-xs">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {paginated.map((op) => (
+                    <tr key={op.operadorId} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-slate-800">{op.nombre}</td>
+                      <td className="px-4 py-3">
+                        {op.url ? (
+                          <a
+                            href={op.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline text-xs truncate block max-w-48"
+                          >
+                            {op.url}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {(op.conjuntosDatos?.length ?? 0) > 0 ? (
+                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                            {op.conjuntosDatos!.length} dataset{op.conjuntosDatos!.length > 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                   {paginated.length === 0 && (
                     <tr>
                       <td colSpan={3} className="px-4 py-10 text-center text-slate-400">
@@ -107,7 +106,7 @@ export default function Operadores() {
             {totalPages > 1 && (
               <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
                 <span>
-                  Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length}
+                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length}
                 </span>
                 <div className="flex gap-2">
                   <button

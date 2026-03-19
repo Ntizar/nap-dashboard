@@ -1,13 +1,17 @@
 import { NavLink } from 'react-router-dom'
+import { useApiKey } from '../../context/ApiKeyContext'
 
 const links = [
   { to: '/', label: 'Resumen', icon: '▦' },
   { to: '/datasets', label: 'Datasets', icon: '⊞' },
   { to: '/operadores', label: 'Operadores', icon: '◎' },
   { to: '/mapa', label: 'Mapa', icon: '⊕' },
+  { to: '/gtfs', label: 'GTFS Viewer', icon: '⊛' },
 ]
 
 export function Sidebar() {
+  const { clearApiKey } = useApiKey()
+
   return (
     <aside className="w-56 min-h-screen bg-slate-900 text-white flex flex-col">
       {/* Logo */}
@@ -39,7 +43,7 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-slate-700">
+      <div className="px-5 py-4 border-t border-slate-700 space-y-2">
         <p className="text-xs text-slate-500">
           Datos:{' '}
           <a
@@ -51,6 +55,13 @@ export function Sidebar() {
             nap.transportes.gob.es
           </a>
         </p>
+        <button
+          onClick={clearApiKey}
+          className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+          title="Cambiar API key"
+        >
+          Cambiar API key
+        </button>
       </div>
     </aside>
   )

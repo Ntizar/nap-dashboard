@@ -1,58 +1,68 @@
-// Tipos de la API NAP Transportes — nap.transportes.gob.es
+// Tipos reales de la API NAP Transportes — verificados contra los endpoints
 
 export interface TipoTransporte {
-  id: number
+  tipoTransporteId: number
   nombre: string
-  descripcion?: string
+  tipoTransporteGrupoId?: number
+  tipoTransporteGrupo?: string
 }
 
 export interface TipoFichero {
   id: number
   nombre: string
-  descripcion?: string
 }
 
 export interface Region {
-  id: number
+  regionId: number
   nombre: string
-  tipoRegion: number
-  tipoRegionNombre?: string
+  tipo: number
+  tipoNombre: string
 }
 
 export interface Organizacion {
-  id: number
+  organizacionId: number
   nombre: string
-  url?: string
-  logoUrl?: string
+  imagen?: unknown
 }
 
 export interface Operador {
-  id: number
-  nombre: string
-  conjutosDatos?: ConjuntoDatos[]
-}
-
-export interface Fichero {
-  id: number
+  operadorId: number
   nombre: string
   url?: string
-  tipoFichero?: TipoFichero
+  conjuntosDatos?: ConjuntoDatos[]
+}
+
+export interface FicheroDto {
+  ficheroId: number
+  tipoFicheroNombre: string
+  numeroViajes?: number
+  numeroRutas?: number
+  numeroParadas?: number
+  tamanio?: number
+  validado?: boolean
   fechaActualizacion?: string
-  avisos?: number
-  metadatos?: Record<string, string>
+  fechaDesde?: string
+  fechaHasta?: string
+  avisos?: unknown[]
+  metadatos?: unknown
 }
 
 export interface ConjuntoDatos {
-  id: number
+  conjuntoDatoId: number
   nombre: string
   descripcion?: string
   organizacion?: Organizacion
   tiposTransporte?: TipoTransporte[]
-  ficheros?: Fichero[]
+  ficherosDto?: FicheroDto[]
   regiones?: Region[]
   operadores?: Operador[]
-  fechaActualizacion?: string
-  urlDescarga?: string
+  fechaCreacion?: string
+}
+
+// Respuesta de /api/Fichero/GetList
+export interface GetListResponse {
+  conjuntosDatoDto: ConjuntoDatos[]
+  filesNum: number
 }
 
 export interface FilterBody {
@@ -64,11 +74,3 @@ export interface FilterBody {
   tipoficheros?: number[]
   organizaciones?: number[]
 }
-
-// Tipo de región (del endpoint /api/Region/GetTypes)
-export const TIPO_REGION = {
-  PROVINCIA: 1,
-  COMUNIDAD: 2,
-  AREA_URBANA: 3,
-  MUNICIPIO: 4,
-} as const

@@ -2,12 +2,15 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sidebar } from './components/layout/Sidebar'
+import { ApiKeyProvider, useApiKey } from './context/ApiKeyContext'
+import { ApiKeyModal } from './components/ApiKeyModal'
 
 // Lazy load de páginas — solo se cargan cuando el usuario navega a ellas
 const Overview = lazy(() => import('./pages/Overview'))
 const Datasets = lazy(() => import('./pages/Datasets'))
 const Operadores = lazy(() => import('./pages/Operadores'))
 const Mapa = lazy(() => import('./pages/Mapa'))
+const GtfsViewer = lazy(() => import('./pages/GtfsViewer'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,24 +34,38 @@ function PageLoader() {
   )
 }
 
+function AppShell() {
+  const { apiKey } = useApiKey()
+
+  // Si no hay key, mostrar modal bloqueante
+  if (!apiKey) return <ApiKeyModal />
+
+  return (
+    <div className="flex h-screen overflow-hidden font-sans">
+      <Sidebar />
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<Overview />} />
+            <Route path="/datasets" element={<Datasets />} />
+            <Route path="/operadores" element={<Operadores />} />
+            <Route path="/mapa" element={<Mapa />} />
+            <Route path="/gtfs" element={<GtfsViewer />} />
+          </Routes>
+        </Suspense>
+      </main>
+    </div>
+  )
+}
+
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <div className="flex h-screen overflow-hidden font-sans">
-          <Sidebar />
-          <main className="flex-1 flex flex-col overflow-hidden">
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Overview />} />
-                <Route path="/datasets" element={<Datasets />} />
-                <Route path="/operadores" element={<Operadores />} />
-                <Route path="/mapa" element={<Mapa />} />
-              </Routes>
-            </Suspense>
-          </main>
-        </div>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ApiKeyProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AppShell />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ApiKeyProvider>
   )
 }
