@@ -24,6 +24,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'URL inválida' })
   }
 
+  // Dominios permitidos: servidores oficiales del NAP + buckets S3 del Ministerio de Transportes.
+  // APRENDIZAJE: el endpoint downloadLink del NAP puede devolver URLs de buckets S3 de AWS
+  // (mfomwpronapdata.s3.eu-west-1.amazonaws.com, etc.) — hay que incluirlos en la whitelist.
+  // El patrón seguro es validar el sufijo '.s3.eu-west-1.amazonaws.com' solo para buckets
+  // conocidos del Ministerio (mfomw* / mitma* / nap*), no abrir todos los S3 de AWS.
   const allowedHosts = [
     'nap.transportes.gob.es',
     'mf.transportes.gob.es',
@@ -31,10 +36,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'datos.gob.es',
     'opendata.renfe.com',
     'www.mitma.es',
+    'mitma.es',
+    // Buckets S3 del Ministerio de Transportes (Fomento/Movilidad)
+    'mfomwpronapdata.s3.eu-west-1.amazonaws.com',
+    'mitmapronapdata.s3.eu-west-1.amazonaws.com',
+    'napdata.s3.eu-west-1.amazonaws.com',
+    'napdata.s3.amazonaws.com',
   ]
-  const isAllowed = allowedHosts.some(
-    (h) => parsedUrl.hostname === h || parsedUrl.hostname.endsWith(`.${h}`)
-  )
+  const isAllowed =
+    allowedHosts.some((h) => parsedUrl.hostname === h || parsedUrl.hostname.endsWith(`.${h}`)) ||
+    // Patrón genérico para cualquier bucket S3 cuyo nombre empiece por 'mfomw', 'mitma' o 'nap'
+    /^(mfomw|mitma|nap)[a-z0-9-]*\.s3\.[a-z0-9-]+\.amazonaws\.com$/.test(parsedUrl.hostname)
   if (!isAllowed) {
     return res.status(403).json({
       error: 'Dominio no permitido',
