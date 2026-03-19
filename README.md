@@ -1,32 +1,44 @@
-# NAP Dashboard — Transportes de España · v1.4.0
+# 🚌 NAP Dashboard — Transportes de España
 
-Dashboard web para explorar el catálogo oficial de datos de transporte público de España, publicado por el Ministerio de Transportes a través del **Punto de Acceso Nacional (NAP)**.
+> Explora el transporte público de todo un país. En el navegador. En tiempo real. Sin instalar nada.
 
-**Demo en producción:** desplegado en Vercel, funciona 100% en el navegador sin instalación.
-
----
-
-## Por qué existe
-
-El [Punto de Acceso Nacional](https://nap.transportes.gob.es) agrega miles de conjuntos de datos de transporte público de toda España: horarios de autobús, tren, metro, tranvía, ferry y más, en formatos estándar como GTFS y NeTEx. El portal oficial permite buscar y descargar ficheros, pero no ofrece ninguna forma de visualizar el contenido de un GTFS directamente en el navegador ni una visión analítica del catálogo completo.
-
-Este dashboard resuelve eso: consume la API del NAP en tiempo real, presenta los datos de forma visual e interactiva, y permite abrir cualquier fichero GTFS del catálogo — directamente en el navegador — para explorar rutas, paradas, horarios y calendarios de servicio sobre un mapa.
+**v1.4.0** · Hecho por **David Antizar** con su Mastermind 🧠
 
 ---
 
-## Qué puede hacer
+¿Sabías que el Ministerio de Transportes de España publica los horarios de **todos** los autobuses, trenes, metros, tranvías y ferries del país en formato abierto? Miles de datasets. Decenas de millones de registros. Todo accesible vía API.
 
-| Sección | Para qué sirve |
-|---------|----------------|
-| **Resumen** | Vista general del catálogo: KPIs, gráfico de actividad mensual, top 5 datasets por volumen, distribución de formatos por tipo de transporte y región |
-| **Datasets** | Tabla completa del catálogo con filtros combinables por tipo de transporte y organización |
-| **Operadores** | Directorio de los ~2.594 operadores de transporte registrados en el NAP |
-| **Mapa** | Cobertura geográfica de los datasets sobre un mapa interactivo de España |
-| **GTFS Viewer** | Abre cualquier GTFS del catálogo: rutas en el mapa, paradas, horarios filtrados por día de la semana, excepciones de servicio y calendario completo |
+El problema: el portal oficial solo permite buscar y descargar ficheros. No hay forma de ver qué hay dentro de un GTFS sin abrir un terminal o instalar herramientas externas.
+
+**Esto lo resuelve.** 🎯
 
 ---
 
-## GTFS Viewer — lo que hace bajo el capó
+## ✨ Qué puedes hacer
+
+| | Sección | Para qué sirve |
+|--|---------|----------------|
+| 📊 | **Resumen** | KPIs del catálogo, actividad mensual, top datasets, distribución de formatos |
+| 📋 | **Datasets** | Tabla completa con filtros por tipo de transporte y organización |
+| 🏢 | **Operadores** | Directorio de los ~2.594 operadores de transporte registrados |
+| 🗺️ | **Mapa** | Cobertura geográfica sobre un mapa interactivo de España |
+| 🔍 | **GTFS Viewer** | Abre cualquier GTFS: rutas en el mapa, paradas, horarios por día, excepciones de servicio |
+
+---
+
+## 🗓️ La feature estrella: selector de semana en el GTFS Viewer
+
+El visor no se limita a mostrar todos los viajes de un feed. Implementa la lógica completa del estándar GTFS para saber qué servicios operan en cada día concreto:
+
+- Navega entre días de la semana con un selector visual compacto
+- Los viajes mostrados son **solo los que realmente circulan ese día**
+- Si un servicio está cancelado ese día → banner rojo ⚠️
+- Si hay un servicio extraordinario → banner verde ✅
+- "Próximas salidas" cuando es hoy · "Salidas del día" cuando es otro día
+
+---
+
+## 🔧 Cómo funciona por dentro
 
 El visor descarga y procesa los ficheros GTFS comprimidos (ZIP) directamente en el navegador, sin servidor, sin backend propio. El parsing incluye:
 
@@ -48,13 +60,13 @@ Con esto, el selector de semana muestra únicamente los viajes que realmente ope
 
 ---
 
-## Capturas de pantalla
+## 📸 Capturas de pantalla
 
 > *(añade imágenes aquí una vez desplegado)*
 
 ---
 
-## Stack tecnológico
+## 🛠️ Stack tecnológico
 
 | Capa | Tecnología |
 |------|-----------|
@@ -77,7 +89,7 @@ Browser → /api/nap/* → [Vercel Proxy] → nap.transportes.gob.es
 
 ---
 
-## Setup local
+## 💻 Setup local
 
 **Requisitos:** Node.js >= 20.15.0, npm >= 10
 
@@ -105,7 +117,7 @@ Abre [http://localhost:5173](http://localhost:5173). El proxy de Vite intercepta
 
 ---
 
-## Deploy en Vercel
+## 🚀 Deploy en Vercel
 
 1. Sube el repositorio a GitHub
 2. Importa el proyecto en [vercel.com/new](https://vercel.com/new)
@@ -116,7 +128,7 @@ Vercel detecta automáticamente la configuración de Vite y aplica `vercel.json`
 
 ---
 
-## Limitaciones conocidas
+## ⚠️ Limitaciones conocidas
 
 - Ficheros GTFS muy grandes (>15 MB descomprimidos) pueden tardar varios segundos en procesarse — el parsing ocurre en el hilo principal del navegador.
 - El mapa de cobertura regional muestra solo regiones con coordenadas en el diccionario interno. Regiones con nombres no reconocidos aparecen en el panel lateral pero no en el mapa.
@@ -124,7 +136,7 @@ Vercel detecta automáticamente la configuración de Vite y aplica `vercel.json`
 
 ---
 
-## Changelog
+## 📋 Changelog
 
 ### v1.4.0 (2026-03-19) — Calendario semanal y excepciones de servicio en el GTFS Viewer
 
