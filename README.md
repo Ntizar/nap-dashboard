@@ -1,56 +1,58 @@
 # NAP Dashboard — Transportes de España
 
-Dashboard web que visualiza el catálogo completo de datos de transporte público de España, publicado por el Ministerio de Transportes a través del **Punto de Acceso Nacional (NAP)** en [nap.transportes.gob.es](https://nap.transportes.gob.es).
+Dashboard web para explorar el catálogo oficial de datos de transporte público de España, publicado por el Ministerio de Transportes a través del **Punto de Acceso Nacional (NAP)**.
 
-Al abrir la app por primera vez, se solicita tu API key del NAP. Se guarda en el navegador (`localStorage`) y nunca abandona tu dispositivo.
+---
 
-## Qué hace
+## Por qué existe
 
-| Página | Descripción |
-|--------|-------------|
-| **Resumen** | KPIs generales (datasets, organizaciones, regiones, tipos de transporte) + gráficos de distribución |
-| **Datasets** | Tabla paginada del catálogo completo con filtros por transporte y organización |
-| **Operadores** | Directorio de los ~2.594 operadores registrados con búsqueda y paginación |
-| **Mapa** | Mapa interactivo de España mostrando cobertura de datasets por región |
-| **GTFS Viewer** | Visualizador interactivo de ficheros GTFS: rutas en el mapa, paradas y horarios |
+El [Punto de Acceso Nacional](https://nap.transportes.gob.es) agrega miles de conjuntos de datos de transporte público de toda España: horarios de bus, tren, metro, tranvía y más, en formatos estándar como GTFS y NeTEx. El portal oficial permite buscar y descargar ficheros, pero no ofrece una visión analítica del catálogo ni una forma rápida de visualizar el contenido de un fichero GTFS sin herramientas externas.
 
-## Stack
+Este dashboard resuelve eso: una interfaz que consume la API del NAP en tiempo real, presenta los datos de forma visual e interactiva, y permite abrir cualquier fichero GTFS directamente en el navegador para ver sus rutas, paradas y horarios en un mapa.
 
-- **Frontend:** React 19 + TypeScript + Vite 5
-- **Estilos:** Tailwind CSS 4
-- **Data fetching:** TanStack Query v5 (caché 5 min)
-- **Gráficos:** Recharts
-- **Mapa:** Leaflet + React-Leaflet
-- **GTFS parsing:** fflate (descompresión ZIP en el browser) + CSV parser nativo
-- **Deploy:** Vercel (Serverless Functions para el proxy)
+---
 
-## Arquitectura de seguridad
+## Qué puede hacer
 
-La API del NAP requiere una `ApiKey` en cada request. Esta key **nunca está en el código ni en el repositorio**:
+| Sección | Para qué sirve |
+|---------|----------------|
+| **Resumen** | Vista general del catálogo: cuántos datasets hay, cuántos operadores, qué tipos de transporte predominan y cómo se distribuyen por región |
+| **Datasets** | Tabla completa del catálogo con filtros por tipo de transporte y organización |
+| **Operadores** | Directorio de los ~2.594 operadores de transporte registrados en el NAP |
+| **Mapa** | Cobertura geográfica de los datasets sobre un mapa interactivo de España |
+| **GTFS Viewer** | Selecciona cualquier fichero GTFS del catálogo y visualiza sus rutas en el mapa, explora sus paradas y consulta los horarios |
+
+---
+
+## Cómo se construyó
+
+El proyecto es una SPA (Single Page Application) que se comunica con la API del NAP a través de un proxy serverless desplegado en Vercel. El proxy es necesario porque la API del NAP bloquea peticiones CORS desde el navegador.
+
+**Stack principal:**
+
+- **React 19 + TypeScript + Vite 5** — interfaz y tooling
+- **TanStack Query v5** — gestión de datos con caché automática
+- **Tailwind CSS 4** — estilos
+- **Recharts** — gráficos de distribución
+- **Leaflet + React-Leaflet** — mapas interactivos
+- **fflate** — descompresión de ficheros GTFS (ZIP) directamente en el navegador
+- **Vercel Serverless Functions** — proxy que añade la API key hacia el NAP
+
+**Seguridad de la API key:**
+
+La API del NAP requiere una clave de acceso. Esta clave nunca está en el código ni en el repositorio. Al abrir la app por primera vez, se solicita la key al usuario mediante un modal; se guarda en `localStorage` del navegador y se envía en cada petición como header `X-Api-Key`. El proxy Vercel la inyecta como `ApiKey` hacia el NAP. Si se configura la variable de entorno `NAP_API_KEY` en Vercel, esta tiene prioridad sobre la key del usuario.
 
 ```
-Browser → /api/nap/* → [Vercel Serverless Function] → nap.transportes.gob.es
+Browser → /api/nap/* → [Vercel Proxy] → nap.transportes.gob.es
                               ↑
-               1. Lee NAP_API_KEY del entorno de Vercel (si existe)
-               2. O bien, lee X-Api-Key del header del cliente (key del usuario en localStorage)
+             NAP_API_KEY (entorno) o X-Api-Key (usuario)
 ```
 
-**Flujo para el usuario:**
-1. Abre la app → aparece un modal pidiendo la API key del NAP
-2. La introduce una sola vez → se guarda en `localStorage` del navegador
-3. Todas las peticiones incluyen la key en el header `X-Api-Key`
-4. El proxy Vercel la inyecta como `ApiKey` hacia el NAP — nunca llega al bundle JS
-
-La key puede cambiarse en cualquier momento desde "Cambiar API key" en el menú lateral.
+---
 
 ## Setup local
 
-### Requisitos
-
-- **Node.js** >= 20.15.0
-- **npm** >= 10
-
-### 1. Clonar e instalar
+**Requisitos:** Node.js >= 20.15.0, npm >= 10
 
 ```bash
 git clone https://github.com/tu-usuario/nap-dashboard.git
@@ -58,122 +60,43 @@ cd nap-dashboard
 npm install
 ```
 
-### 2. Configurar la API key
-
-Crea el fichero `.env.local` (está en `.gitignore`, nunca se sube):
+Crea el fichero `.env.local` con tu API key del NAP (puedes solicitarla en [nap.transportes.gob.es](https://nap.transportes.gob.es)):
 
 ```bash
 cp .env.example .env.local
-# Edita .env.local y añade tu API key del NAP:
+# Edita .env.local:
 # NAP_API_KEY=tu-api-key-aqui
 ```
 
-Puedes solicitar una API key en [nap.transportes.gob.es](https://nap.transportes.gob.es).
-
-### 3. Arrancar en desarrollo
+Arranca el servidor de desarrollo:
 
 ```bash
 npm run dev
 ```
 
-Abre [http://localhost:5173](http://localhost:5173). El proxy de Vite intercepta todas las llamadas a `/api/nap/*` y añade la key automáticamente.
+Abre [http://localhost:5173](http://localhost:5173). El proxy de Vite intercepta las llamadas a `/api/nap/*` automáticamente.
 
-### 4. Build de producción
-
-```bash
-npm run build
-```
-
-Genera `dist/`. Para previsualizar localmente:
-
-```bash
-npm run preview
-```
-
-> **Nota:** `npm run preview` no incluye el proxy. Para probar la integración completa con la API necesitas hacer deploy en Vercel o usar `vercel dev`.
+---
 
 ## Deploy en Vercel
 
-### Opción A — Desde la web de Vercel (recomendado)
-
 1. Sube el repositorio a GitHub
-2. Ve a [vercel.com/new](https://vercel.com/new) e importa el repositorio
-3. En **Environment Variables**, añade:
-   - **Name:** `NAP_API_KEY`
-   - **Value:** tu API key del NAP
+2. Importa el proyecto en [vercel.com/new](https://vercel.com/new)
+3. En **Environment Variables**, añade `NAP_API_KEY` con tu API key del NAP
 4. Haz clic en **Deploy**
 
-Vercel detecta automáticamente que es un proyecto Vite y aplica la configuración de `vercel.json`.
+Vercel detecta automáticamente la configuración de Vite y aplica `vercel.json`.
 
-### Opción B — Desde la CLI de Vercel
-
-```bash
-npm i -g vercel
-vercel login
-vercel --prod
-```
-
-Durante el setup, añade la variable de entorno cuando te la pida, o después desde el dashboard de Vercel en **Settings → Environment Variables**.
-
-### Variables de entorno requeridas en Vercel
-
-| Variable | Descripción |
-|----------|-------------|
-| `NAP_API_KEY` | API key del Punto de Acceso Nacional de transportes |
-
-## Estructura del proyecto
-
-```
-nap-dashboard/
-├── api/
-│   └── nap/
-│       └── proxy.ts          # Serverless Function — proxy con ApiKey server-side
-├── src/
-│   ├── lib/
-│   │   ├── types.ts           # Tipos TypeScript del schema real de la API NAP
-│   │   └── napClient.ts       # Cliente HTTP (todas las llamadas a /api/nap/*)
-│   ├── hooks/
-│   │   └── useNap.ts          # TanStack Query hooks con caché de 5 minutos
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Sidebar.tsx    # Navegación lateral
-│   │   │   └── Header.tsx     # Cabecera de página
-│   │   ├── cards/
-│   │   │   ├── KpiCard.tsx    # Tarjeta de KPI
-│   │   │   └── Skeleton.tsx   # Loaders animados
-│   │   └── charts/
-│   │       ├── HorizontalBarChart.tsx
-│   │       └── DonutChart.tsx
-│   └── pages/
-│       ├── Overview.tsx       # Vista general con KPIs y gráficos
-│       ├── Datasets.tsx       # Tabla filtrable del catálogo
-│       ├── Operadores.tsx     # Directorio de operadores
-│       └── Mapa.tsx           # Mapa de cobertura por región
-├── .env.example               # Plantilla de variables de entorno
-├── vercel.json                # Rewrite /api/nap/* → proxy serverless
-└── vite.config.ts             # Proxy de desarrollo local
-```
-
-## API cubierta
-
-Endpoints del NAP que consume el dashboard:
-
-| Endpoint | Descripción |
-|----------|-------------|
-| `GET /Fichero/GetList` | Lista completa de datasets del catálogo |
-| `POST /Fichero/Filter` | Filtrado de datasets por región/transporte/organización |
-| `GET /Fichero/downloadLink/:id` | URL de descarga de un fichero (GTFS, NeTEx, etc.) |
-| `GET /TipoTransporte` | Catálogo de tipos de transporte (bus, tren, metro…) |
-| `GET /Region` | Regiones geográficas (~8.288 entradas) |
-| `GET /Organizacion` | Organizaciones publicadoras |
-| `GET /Operador` | Operadores de transporte (~2.594 entradas) |
+---
 
 ## Limitaciones conocidas
 
-- **Mapa:** Solo muestra pins para regiones con coordenadas en el diccionario `REGION_COORDS` de `Mapa.tsx`. Regiones con nombres no reconocidos no aparecen en el mapa (sí en el panel lateral).
-- **Operadores:** Los ~2.594 operadores se cargan en memoria en una sola petición. No hay paginación server-side en la API del NAP.
-- **Error 401:** Si la `NAP_API_KEY` no está configurada, la app muestra un banner de error genérico. Asegúrate de que la variable está presente en Vercel antes de hacer deploy.
+- Los ficheros GTFS grandes (>10 MB) pueden tardar varios segundos en procesarse, ya que la descompresión y el parsing ocurren en el hilo principal del navegador.
+- El mapa de cobertura regional solo muestra las regiones con coordenadas conocidas en el diccionario interno. Regiones con nombres no reconocidos aparecen en el panel lateral pero no en el mapa.
+- Los ~2.594 operadores se cargan en memoria en una sola petición (la API del NAP no ofrece paginación server-side para este endpoint).
 
-## Licencia
+---
 
-Los datos son publicados por el Ministerio de Transportes de España bajo la licencia abierta del NAP. El código de este dashboard es de uso libre.
+## Datos y licencia
+
+Los datos son publicados por el Ministerio de Transportes, Movilidad y Agenda Urbana de España bajo la licencia abierta del NAP. El código de este dashboard es de uso libre.
