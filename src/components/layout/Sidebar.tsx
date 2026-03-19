@@ -34,13 +34,18 @@ const links = [
   )},
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  open?: boolean
+  onClose?: () => void
+}
+
+export function Sidebar({ open = true, onClose }: SidebarProps) {
   const { clearApiKey } = useApiKey()
 
-  return (
-    <aside className="w-56 min-h-screen bg-white text-slate-700 flex flex-col border-r border-slate-200 shadow-sm flex-shrink-0">
+  const sidebarContent = (
+    <aside className="w-56 h-full bg-white text-slate-700 flex flex-col border-r border-slate-200 shadow-sm">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-slate-100">
+      <div className="px-5 py-5 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, #1a56a0, #0f3460)' }}>
@@ -53,6 +58,18 @@ export function Sidebar() {
             <p className="text-[10px] text-slate-400 leading-tight">Transportes España</p>
           </div>
         </div>
+        {/* Close button — only visible on mobile */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            aria-label="Cerrar menú"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Navegación */}
@@ -62,6 +79,7 @@ export function Sidebar() {
             key={to}
             to={to}
             end={to === '/'}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 isActive
@@ -106,5 +124,30 @@ export function Sidebar() {
         </p>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop: always visible, part of normal flow */}
+      <div className="hidden md:flex flex-shrink-0 min-h-screen">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile: overlay drawer */}
+      {open && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          {/* Drawer */}
+          <div className="relative z-50 flex flex-col h-full">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   )
 }

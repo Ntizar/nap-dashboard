@@ -3,7 +3,9 @@ import { useOperators } from '../hooks/useNap'
 import { Header } from '../components/layout/Header'
 import { TableSkeleton } from '../components/cards/Skeleton'
 
-export default function Operadores() {
+interface OperadoresProps { onMenuToggle?: () => void }
+
+export default function Operadores({ onMenuToggle }: OperadoresProps) {
   const { data: operators, isLoading, isError } = useOperators()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
@@ -22,7 +24,7 @@ export default function Operadores() {
   if (isError) {
     return (
       <div className="flex-1 bg-slate-50">
-        <Header title="Operadores" />
+        <Header title="Operadores" onMenuToggle={onMenuToggle} />
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-red-700 text-sm">
             Error cargando operadores.
@@ -37,6 +39,7 @@ export default function Operadores() {
       <Header
         title="Operadores de Transporte"
         subtitle={`${filtered.length} operadores registrados en el catálogo NAP`}
+        onMenuToggle={onMenuToggle}
       />
 
       <div className="p-6 space-y-4">

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sidebar } from './components/layout/Sidebar'
@@ -36,21 +36,22 @@ function PageLoader() {
 
 function AppShell() {
   const { apiKey } = useApiKey()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Si no hay key, mostrar modal bloqueante
   if (!apiKey) return <ApiKeyModal />
 
   return (
     <div className="flex h-screen overflow-hidden font-sans">
-      <Sidebar />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/datasets" element={<Datasets />} />
-            <Route path="/operadores" element={<Operadores />} />
-            <Route path="/mapa" element={<Mapa />} />
-            <Route path="/gtfs" element={<GtfsViewer />} />
+            <Route path="/" element={<Overview onMenuToggle={() => setSidebarOpen(true)} />} />
+            <Route path="/datasets" element={<Datasets onMenuToggle={() => setSidebarOpen(true)} />} />
+            <Route path="/operadores" element={<Operadores onMenuToggle={() => setSidebarOpen(true)} />} />
+            <Route path="/mapa" element={<Mapa onMenuToggle={() => setSidebarOpen(true)} />} />
+            <Route path="/gtfs" element={<GtfsViewer onMenuToggle={() => setSidebarOpen(true)} />} />
           </Routes>
         </Suspense>
       </main>

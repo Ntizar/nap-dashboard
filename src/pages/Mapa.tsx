@@ -70,9 +70,10 @@ function findCoords(nombre: string): [number, number] | null {
   return entry ? entry[1] : null
 }
 
-export default function Mapa() {
+export default function Mapa({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { data: response, isLoading } = useDatasets()
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const datasets: ConjuntoDatos[] = response?.conjuntosDatoDto ?? []
 
@@ -108,11 +109,25 @@ export default function Mapa() {
       <Header
         title="Mapa de cobertura"
         subtitle="Distribución de datasets por región de España"
+        onMenuToggle={onMenuToggle}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile toggle button */}
+        <button
+          onClick={() => setPanelOpen(o => !o)}
+          className="md:hidden absolute top-2 left-2 z-20 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
+        >
+          {panelOpen ? 'Ocultar regiones' : 'Regiones'}
+        </button>
+
         {/* Panel lateral — regiones ordenadas por cobertura */}
-        <div className="w-64 bg-white border-r border-slate-200 overflow-y-auto flex-shrink-0">
+        <div className={`
+          absolute md:relative inset-y-0 left-0 z-10
+          w-64 bg-white border-r border-slate-200 flex-shrink-0 overflow-y-auto
+          transition-transform duration-200
+          ${panelOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}>
           <div className="p-4 border-b border-slate-100">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Regiones con datos ({Object.keys(regionGroups).length})
@@ -124,7 +139,7 @@ export default function Mapa() {
               .map(([name, data]) => (
                 <button
                   key={name}
-                  onClick={() => setSelectedRegion(name === selectedRegion ? null : name)}
+                  onClick={() => { setSelectedRegion(name === selectedRegion ? null : name); setPanelOpen(false) }}
                   className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors ${
                     selectedRegion === name ? 'bg-blue-50 border-l-2 border-blue-500' : ''
                   }`}

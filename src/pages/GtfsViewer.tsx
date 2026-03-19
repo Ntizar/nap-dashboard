@@ -34,6 +34,22 @@ function isGtfs(f: FicheroDto): boolean {
   return f.tipoFicheroNombre?.toLowerCase().includes('gtfs') ?? false
 }
 
+const TRIPS_PAGE_SIZE = 25
+
+// Returns HH:MM from a GTFS time string (which can be 25:30:00 for overnight)
+function normalizeTime(t: string): string {
+  if (!t) return ''
+  const parts = t.split(':')
+  const h = parseInt(parts[0] ?? '0', 10) % 24
+  return `${String(h).padStart(2, '0')}:${parts[1] ?? '00'}`
+}
+
+// Current local time as HH:MM
+function nowHHMM(): string {
+  const n = new Date()
+  return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`
+}
+
 // ── Helpers UI ────────────────────────────────────────────────────────────────
 function Badge({ children, color }: { children: React.ReactNode; color: string }) {
   return (
@@ -70,7 +86,7 @@ const ROUTE_TYPE_COLORS_BG: Record<number, string> = {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function GtfsViewer() {
+export default function GtfsViewer({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { data: response, isLoading: loadingCatalog } = useDatasets()
 
   const [search, setSearch] = useState('')
@@ -84,6 +100,15 @@ export default function GtfsViewer() {
   const [boundsKey, setBoundsKey] = useState(0)
   const [stopSearch, setStopSearch] = useState('')
   const [routeSearch, setRouteSearch] = useState('')
+
+  // Trip selector state
+  const [tripSearch, setTripSearch] = useState('')
+  const [tripPage, setTripPage] = useState(0)
+
+  // Mobile: panel visibility
+  const [leftOpen, setLeftOpen] = useState(false)
+  const [rightOpen, setRightOpen] = useState(false)
+
   const scheduleRef = useRef<HTMLDivElement>(null)
 
   // Datasets GTFS filtrados
@@ -120,6 +145,9 @@ export default function GtfsViewer() {
     setSelectedRoute(null)
     setSelectedTrip(null)
     setActiveTab('rutas')
+    setTripSearch('')
+    setTripPage(0)
+    setLeftOpen(false)
 
     try {
       const zipBuffer = await downloadGtfsZip(item.fichero.ficheroId)
@@ -133,12 +161,15 @@ export default function GtfsViewer() {
     }
   }, [])
 
-  // Al seleccionar ruta, auto-seleccionar primer trip
+  // Al seleccionar ruta, auto-seleccionar primer trip y abrir panel derecho
   const handleSelectRoute = useCallback((route: GtfsRoute | null) => {
     setSelectedRoute(route)
+    setTripSearch('')
+    setTripPage(0)
     if (route && gtfs) {
       const trips = gtfs.tripsByRouteId.get(route.route_id) ?? []
       setSelectedTrip(trips[0] ?? null)
+      setRightOpen(true)
     } else {
       setSelectedTrip(null)
     }
@@ -207,18 +238,52 @@ export default function GtfsViewer() {
     return base.filter((s) => s.stop_name.toLowerCase().includes(q) || (s.stop_code ?? '').toLowerCase().includes(q))
   }, [stopsToShow, gtfs, selectedRoute, stopSearch])
 
-  // Trips de la ruta seleccionada (agrupados por direction)
-  const tripsByDirection = useMemo(() => {
-    if (!gtfs || !selectedRoute) return { '0': [], '1': [], undefined: [] } as Record<string, GtfsTrip[]>
+  // Trips de la ruta seleccionada — TODOS, con search + paginación
+  const allTripsForRoute = useMemo(() => {
+    if (!gtfs || !selectedRoute) return []
     const trips = gtfs.tripsByRouteId.get(selectedRoute.route_id) ?? []
-    const groups: Record<string, GtfsTrip[]> = {}
-    for (const t of trips) {
-      const dir = t.direction_id ?? 'undef'
-      groups[dir] = groups[dir] ?? []
-      groups[dir].push(t)
+    const firstDep = (trip: GtfsTrip) => {
+      const times = gtfs.stopTimesByTripId.get(trip.trip_id) ?? []
+      const sorted = [...times].sort((a, b) => a.stop_sequence - b.stop_sequence)
+      return sorted[0]?.departure_time ?? ''
     }
-    return groups
+    return [...trips].sort((a, b) => firstDep(a).localeCompare(firstDep(b)))
   }, [gtfs, selectedRoute])
+
+  const filteredTrips = useMemo(() => {
+    if (!tripSearch) return allTripsForRoute
+    const q = tripSearch.toLowerCase()
+    return allTripsForRoute.filter((t) => {
+      const times = gtfs?.stopTimesByTripId.get(t.trip_id) ?? []
+      const sorted = [...times].sort((a, b) => a.stop_sequence - b.stop_sequence)
+      const dep = normalizeTime(sorted[0]?.departure_time ?? '')
+      return (
+        (t.trip_headsign ?? '').toLowerCase().includes(q) ||
+        (t.trip_short_name ?? '').toLowerCase().includes(q) ||
+        dep.includes(q)
+      )
+    })
+  }, [allTripsForRoute, tripSearch, gtfs])
+
+  const tripTotalPages = Math.max(1, Math.ceil(filteredTrips.length / TRIPS_PAGE_SIZE))
+  const pagedTrips = filteredTrips.slice(tripPage * TRIPS_PAGE_SIZE, (tripPage + 1) * TRIPS_PAGE_SIZE)
+
+  // Próximas salidas hoy (cuando no hay trip seleccionado y hay datos)
+  const proximasSalidas = useMemo(() => {
+    if (!gtfs || !selectedRoute || selectedTrip) return []
+    const now = nowHHMM()
+    const trips = gtfs.tripsByRouteId.get(selectedRoute.route_id) ?? []
+    const withDep: { trip: GtfsTrip; dep: string }[] = []
+    for (const trip of trips) {
+      const times = gtfs.stopTimesByTripId.get(trip.trip_id) ?? []
+      const sorted = [...times].sort((a, b) => a.stop_sequence - b.stop_sequence)
+      const dep = sorted[0]?.departure_time
+      if (!dep) continue
+      const norm = normalizeTime(dep)
+      if (norm >= now) withDep.push({ trip, dep: norm })
+    }
+    return withDep.sort((a, b) => a.dep.localeCompare(b.dep)).slice(0, 10)
+  }, [gtfs, selectedRoute, selectedTrip])
 
   // Horario del trip seleccionado
   const scheduleRows = useMemo(() => {
@@ -259,19 +324,56 @@ export default function GtfsViewer() {
     ? [gtfs.stops[0].stop_lat, gtfs.stops[0].stop_lon]
     : [40.416775, -3.70379]
 
+  // Reset page when search changes
+  useEffect(() => { setTripPage(0) }, [tripSearch, selectedRoute])
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col overflow-hidden" style={{ background: '#f4f6f8' }}>
       <Header
         title="Visualizador GTFS"
         subtitle="Explora rutas, paradas y horarios de cualquier dataset GTFS del catálogo NAP"
+        onMenuToggle={onMenuToggle}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      {/* Mobile toolbar */}
+      <div className="flex md:hidden items-center gap-2 px-3 py-2 bg-white border-b border-slate-200 text-xs">
+        <button
+          onClick={() => { setLeftOpen(v => !v); setRightOpen(false) }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-medium"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Datasets
+        </button>
+        {gtfs && (
+          <button
+            onClick={() => { setRightOpen(v => !v); setLeftOpen(false) }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-nap-blue font-medium border border-blue-100"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+          </button>
+        )}
+        {gtfs && (
+          <span className="ml-auto text-slate-400 text-[11px]">
+            {gtfs.routes.length} rutas · {gtfs.stops.length} paradas
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-1 overflow-hidden relative">
 
         {/* ── Panel izquierdo: selector ──────────────────────────────────── */}
-        <div className="w-64 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 shadow-sm">
-          <div className="p-3 border-b border-slate-100">
+        {/* Desktop: always visible. Mobile: overlay drawer */}
+        <div className={`
+          bg-white border-r border-slate-200 flex flex-col flex-shrink-0 shadow-sm z-30
+          md:w-64 md:static md:translate-x-0
+          ${leftOpen
+            ? 'fixed inset-y-0 left-0 w-72 translate-x-0 transition-transform duration-200'
+            : 'hidden md:flex'}
+        `}>
+          {/* Mobile close */}
+          <div className="flex items-center justify-between p-3 border-b border-slate-100 md:block">
             <input
               type="text"
               placeholder="Buscar dataset GTFS..."
@@ -279,6 +381,10 @@ export default function GtfsViewer() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-nap-blue bg-slate-50"
             />
+            <button
+              onClick={() => setLeftOpen(false)}
+              className="md:hidden ml-2 flex-shrink-0 text-slate-400 hover:text-slate-600 text-lg leading-none"
+            >✕</button>
           </div>
 
           <div className="overflow-y-auto flex-1 text-xs">
@@ -324,23 +430,31 @@ export default function GtfsViewer() {
           </div>
         </div>
 
+        {/* Mobile overlay backdrop */}
+        {(leftOpen || rightOpen) && (
+          <div
+            className="fixed inset-0 bg-black/30 z-20 md:hidden"
+            onClick={() => { setLeftOpen(false); setRightOpen(false) }}
+          />
+        )}
+
         {/* ── Panel central: mapa ─────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="flex-1 flex flex-col overflow-hidden relative min-w-0">
 
           {/* Barra de estado */}
           {gtfs && !loading && (
             <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-slate-200 text-xs text-slate-600 flex-wrap">
-              <span className="font-semibold text-slate-800 truncate max-w-xs">{selected?.dataset.nombre}</span>
-              <span className="text-slate-300">|</span>
-              <span className="text-nap-blue font-medium">{gtfs.routes.length} rutas</span>
-              <span className="text-slate-300">|</span>
-              <span>{gtfs.stops.length} paradas</span>
-              <span className="text-slate-300">|</span>
-              <span>{gtfs.trips.length} viajes</span>
+              <span className="font-semibold text-slate-800 truncate max-w-[200px]">{selected?.dataset.nombre}</span>
+              <span className="text-slate-300 hidden sm:inline">|</span>
+              <span className="text-nap-blue font-medium hidden sm:inline">{gtfs.routes.length} rutas</span>
+              <span className="text-slate-300 hidden sm:inline">|</span>
+              <span className="hidden sm:inline">{gtfs.stops.length} paradas</span>
+              <span className="text-slate-300 hidden md:inline">|</span>
+              <span className="hidden md:inline">{gtfs.trips.length} viajes</span>
               {gtfs.agencies[0] && (
                 <>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-500">{gtfs.agencies[0].agency_name}</span>
+                  <span className="text-slate-300 hidden md:inline">|</span>
+                  <span className="text-slate-500 hidden md:inline">{gtfs.agencies[0].agency_name}</span>
                 </>
               )}
               {selectedRoute && (
@@ -348,7 +462,7 @@ export default function GtfsViewer() {
                   <span className="text-slate-300">|</span>
                   <button onClick={() => { handleSelectRoute(null); setActiveTab('rutas') }}
                     className="text-nap-blue hover:underline font-medium">
-                    ← Todas las rutas
+                    ← Todas
                   </button>
                 </>
               )}
@@ -375,7 +489,7 @@ export default function GtfsViewer() {
           )}
 
           {/* Mapa */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative" style={{ minHeight: '200px' }}>
             {!gtfs && !loading && !error ? (
               <div className="flex items-center justify-center h-full flex-col gap-3 text-slate-400">
                 <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-2xl">
@@ -436,9 +550,20 @@ export default function GtfsViewer() {
 
         {/* ── Panel derecho: tabs ──────────────────────────────────────────── */}
         {gtfs && (
-          <div className="w-80 bg-white border-l border-slate-200 flex flex-col flex-shrink-0 shadow-sm">
+          <div className={`
+            bg-white border-l border-slate-200 flex flex-col flex-shrink-0 shadow-sm z-30
+            md:w-80 md:static md:translate-x-0
+            ${rightOpen
+              ? 'fixed inset-y-0 right-0 w-80 translate-x-0 transition-transform duration-200'
+              : 'hidden md:flex'}
+          `}>
             {/* Tabs */}
             <div className="flex border-b border-slate-200 flex-shrink-0">
+              {/* Mobile close */}
+              <button
+                onClick={() => setRightOpen(false)}
+                className="md:hidden px-2 py-2.5 text-slate-400 hover:text-slate-600"
+              >✕</button>
               {availableTabs.map((tab) => (
                 <button
                   key={tab}
@@ -449,7 +574,7 @@ export default function GtfsViewer() {
                       : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
-                  {tab === 'info' ? 'Información' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab === 'info' ? 'Info' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
             </div>
@@ -475,7 +600,7 @@ export default function GtfsViewer() {
                         key={route.route_id}
                         onClick={() => {
                           handleSelectRoute(isActive ? null : route)
-                          setActiveTab('rutas')
+                          setActiveTab('horarios')
                         }}
                         className={`w-full text-left px-3 py-2.5 border-b border-slate-100 flex items-start gap-2.5 hover:bg-slate-50 transition-colors ${
                           isActive ? 'bg-blue-50' : ''
@@ -563,52 +688,108 @@ export default function GtfsViewer() {
                   </div>
                 ) : (
                   <>
-                    {/* Selector de viaje por dirección */}
-                    <div className="flex-shrink-0 border-b border-slate-100 overflow-y-auto max-h-48">
-                      {Object.entries(tripsByDirection).map(([dir, dirTrips]) => {
-                        if (dirTrips.length === 0) return null
-                        const label = dir === '0' ? 'Ida' : dir === '1' ? 'Vuelta' : 'Todos los viajes'
-                        const firstDep = (trip: GtfsTrip) => {
-                          const times = gtfs.stopTimesByTripId.get(trip.trip_id) ?? []
-                          const sorted = [...times].sort((a, b) => a.stop_sequence - b.stop_sequence)
-                          return sorted[0]?.departure_time ?? ''
-                        }
-                        const sorted = [...dirTrips].sort((a, b) =>
-                          firstDep(a).localeCompare(firstDep(b))
-                        )
-                        return (
-                          <div key={dir} className="px-2 py-1.5">
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1">
-                              {label} · {dirTrips.length} viajes
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {sorted.slice(0, 60).map((trip) => {
-                                const dep = firstDep(trip)
-                                const isActive = selectedTrip?.trip_id === trip.trip_id
-                                return (
-                                  <button
-                                    key={trip.trip_id}
-                                    onClick={() => setSelectedTrip(trip)}
-                                    title={trip.trip_headsign ?? trip.trip_id}
-                                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded transition-colors ${
-                                      isActive
-                                        ? 'bg-nap-blue text-white'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
-                                  >
-                                    {dep || trip.trip_short_name || trip.trip_id.slice(-4)}
-                                  </button>
-                                )
-                              })}
-                              {sorted.length > 60 && (
-                                <span className="text-[10px] text-slate-400 self-center px-1">
-                                  +{sorted.length - 60} más
-                                </span>
-                              )}
-                            </div>
+                    {/* ── Trip selector con búsqueda y paginación ── */}
+                    <div className="flex-shrink-0 border-b border-slate-100">
+                      {/* Header de la ruta */}
+                      <div className="px-3 pt-2 pb-1.5 flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: routeColor(selectedRoute) }} />
+                        <span className="text-xs font-semibold text-slate-700 truncate flex-1">
+                          {selectedRoute.route_short_name && <span className="mr-1">[{selectedRoute.route_short_name}]</span>}
+                          {selectedRoute.route_long_name || selectedRoute.route_id}
+                        </span>
+                        <span className="text-[10px] text-slate-400 flex-shrink-0">{allTripsForRoute.length} viajes</span>
+                      </div>
+
+                      {/* Búsqueda de viajes */}
+                      <div className="px-2 pb-2">
+                        <input
+                          type="text"
+                          placeholder="Buscar por destino, nombre u hora (ej: 08:30)..."
+                          value={tripSearch}
+                          onChange={(e) => setTripSearch(e.target.value)}
+                          className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-nap-blue bg-slate-50"
+                        />
+                      </div>
+
+                      {/* Próximas salidas si no hay trip seleccionado */}
+                      {proximasSalidas.length > 0 && !selectedTrip && !tripSearch && (
+                        <div className="px-2 pb-2">
+                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1 flex items-center gap-1">
+                            <span>🕐</span> Próximas salidas hoy
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {proximasSalidas.map(({ trip, dep }) => (
+                              <button
+                                key={trip.trip_id}
+                                onClick={() => setSelectedTrip(trip)}
+                                title={trip.trip_headsign ?? trip.trip_id}
+                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-nap-blue hover:bg-blue-100 border border-blue-100 transition-colors"
+                              >
+                                {dep}
+                                {trip.trip_headsign && (
+                                  <span className="font-sans text-slate-500 ml-1 not-italic">
+                                    {trip.trip_headsign.slice(0, 12)}{trip.trip_headsign.length > 12 ? '…' : ''}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
                           </div>
-                        )
-                      })}
+                        </div>
+                      )}
+
+                      {/* Lista paginada de viajes */}
+                      <div className="px-2 pb-2">
+                        {tripSearch && (
+                          <p className="text-[10px] text-slate-400 px-1 mb-1">
+                            {filteredTrips.length} resultados
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {pagedTrips.map((trip) => {
+                            const times = gtfs.stopTimesByTripId.get(trip.trip_id) ?? []
+                            const sorted = [...times].sort((a, b) => a.stop_sequence - b.stop_sequence)
+                            const dep = normalizeTime(sorted[0]?.departure_time ?? '')
+                            const isActive = selectedTrip?.trip_id === trip.trip_id
+                            return (
+                              <button
+                                key={trip.trip_id}
+                                onClick={() => setSelectedTrip(trip)}
+                                title={trip.trip_headsign ?? trip.trip_id}
+                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded transition-colors ${
+                                  isActive
+                                    ? 'bg-nap-blue text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {dep || trip.trip_short_name || trip.trip_id.slice(-4)}
+                              </button>
+                            )
+                          })}
+                          {pagedTrips.length === 0 && (
+                            <p className="text-[10px] text-slate-400 px-1">Sin resultados</p>
+                          )}
+                        </div>
+
+                        {/* Paginación */}
+                        {tripTotalPages > 1 && (
+                          <div className="flex items-center justify-between mt-2 px-1">
+                            <button
+                              onClick={() => setTripPage(p => Math.max(0, p - 1))}
+                              disabled={tripPage === 0}
+                              className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-200 transition-colors"
+                            >← Anterior</button>
+                            <span className="text-[10px] text-slate-400">
+                              {tripPage + 1} / {tripTotalPages}
+                              {' '}({filteredTrips.length} viajes)
+                            </span>
+                            <button
+                              onClick={() => setTripPage(p => Math.min(tripTotalPages - 1, p + 1))}
+                              disabled={tripPage >= tripTotalPages - 1}
+                              className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-200 transition-colors"
+                            >Siguiente →</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Detalle del trip seleccionado */}
@@ -731,6 +912,31 @@ export default function GtfsViewer() {
             {/* ── Tab Información ──────────────────────────────────────────── */}
             {activeTab === 'info' && (
               <div className="flex-1 overflow-y-auto p-3 text-xs space-y-4">
+
+                {/* Parse warnings */}
+                {gtfs.parseWarnings.length > 0 && (
+                  <section>
+                    <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Avisos del parser
+                    </h4>
+                    <div className="space-y-1">
+                      {gtfs.parseWarnings.map((w, i) => (
+                        <div key={i} className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-[10px]">
+                          <span className="font-semibold text-amber-700 font-mono">{w.file}</span>
+                          {w.skippedRows > 0 && (
+                            <span className="text-amber-600 ml-1">— {w.skippedRows} filas ignoradas por formato incorrecto</span>
+                          )}
+                          {w.capped && (
+                            <span className="text-amber-600 ml-1">— limitado a {w.cappedAt?.toLocaleString('es-ES')} registros</span>
+                          )}
+                          {w.encodingFallback && (
+                            <span className="text-amber-600 ml-1">— encoding detectado: {w.encodingFallback}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 {/* Feed info */}
                 {gtfs.feedInfo && (

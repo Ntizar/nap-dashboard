@@ -1,4 +1,4 @@
-# NAP Dashboard — Transportes de España
+# NAP Dashboard — Transportes de España · v1.3.0
 
 Dashboard web para explorar el catálogo oficial de datos de transporte público de España, publicado por el Ministerio de Transportes a través del **Punto de Acceso Nacional (NAP)**.
 
@@ -104,3 +104,35 @@ Los datos son publicados por el Ministerio de Transportes, Movilidad y Agenda Ur
 ---
 
 Hecho por **David Antizar** con su Mastermind.
+
+---
+
+## Changelog
+
+### v1.3.0 (2026-03-19) — Dashboard enriquecido + GTFS robusto + Responsive completo
+
+**Block A — Overview enriquecido**
+- KPIs secundarios: total de ficheros, datasets validados, datasets con alertas
+- Gráfico de actividad (AreaChart) con los ficheros actualizados por mes, últimos 12 meses
+- Tabla Top 5 datasets por volumen de rutas/paradas, con iconos de transporte y navegación directa al visor
+- Distribución de formatos (GTFS / NeTEx / DATEX II / SIRI / Otros) como HorizontalBarChart
+
+**Block B — GTFS Viewer robusto**
+- Fallback de encoding UTF-8 → Windows-1252 cuando se detectan caracteres corruptos (`\uFFFD`)
+- Tolerancia a filas malformadas: cada fila se parsea en try/catch y se cuentan los errores
+- Tipos de ruta europeos extendidos (NeTEx 100–1700): tren de larga distancia, metro, tranvía, ferry, funicular, etc.
+- Selector de viajes paginado (25/página) con búsqueda por cabecera, nombre o primera salida
+- "Próximas salidas hoy" al seleccionar una ruta sin viaje activo
+- Avisos de parseo (filas omitidas, encoding fallback, cap de stop_times) en la pestaña Info
+
+**Block C — Responsive completo**
+- Sidebar convertido en drawer lateral en móvil con overlay y botón de cierre
+- Botón hamburger en todos los headers, visible solo en `< md`
+- Mapa: panel de regiones se oculta en móvil con botón de toggle
+- Datasets: filtros apilados en móvil, columnas de tabla ocultas progresivamente (`sm`/`md`/`lg`)
+- GtfsViewer: paneles izquierdo y derecho como drawers en móvil con toolbar propio
+- `font-size: 16px` global en inputs/selects para evitar zoom automático en iOS
+
+### v1.2.0 — GTFS Viewer avanzado con mapa, paradas y horarios
+### v1.1.0 — Mapa interactivo de cobertura regional
+### v1.0.0 — Dashboard inicial (Resumen, Datasets, Operadores)

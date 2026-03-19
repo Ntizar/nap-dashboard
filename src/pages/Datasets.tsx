@@ -17,7 +17,9 @@ function Badge({ text, color = 'blue' }: { text: string; color?: 'blue' | 'green
   )
 }
 
-export default function Datasets() {
+interface DatasetsProps { onMenuToggle?: () => void }
+
+export default function Datasets({ onMenuToggle }: DatasetsProps) {
   const { data: response, isLoading, isError } = useDatasets()
   const { data: transportTypes } = useTransportTypes()
   const { data: organizations } = useOrganizations()
@@ -59,7 +61,7 @@ export default function Datasets() {
   if (isError) {
     return (
       <div className="flex-1 bg-slate-50">
-        <Header title="Datasets" subtitle="Catálogo de conjuntos de datos de transporte" />
+        <Header title="Datasets" subtitle="Catálogo de conjuntos de datos de transporte" onMenuToggle={onMenuToggle} />
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-red-700 text-sm">
             Error cargando datos.
@@ -74,17 +76,18 @@ export default function Datasets() {
       <Header
         title="Datasets"
         subtitle={`${filtered.length} conjuntos de datos${filtered.length !== datasets.length ? ` (filtrado de ${datasets.length})` : ''}`}
+        onMenuToggle={onMenuToggle}
       />
 
       <div className="p-6 space-y-4">
         {/* Filtros */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row flex-wrap gap-3">
           <input
             type="text"
             placeholder="Buscar por nombre, descripción u organización..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-            className="flex-1 min-w-52 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-0 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
             value={filterTransport}
@@ -126,10 +129,10 @@ export default function Datasets() {
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 w-2/5">Nombre</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Organización</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Transporte</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Ficheros</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Actualización</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Organización</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Transporte</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Ficheros</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Actualización</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -154,22 +157,22 @@ export default function Datasets() {
                             <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{ds.descripcion}</p>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 text-xs">{org}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-slate-600 text-xs hidden sm:table-cell">{org}</td>
+                        <td className="px-4 py-3 hidden md:table-cell">
                           <div className="flex flex-wrap gap-1">
                             {tipos.slice(0, 2).map((t) => (
                               <Badge key={t.tipoTransporteId} text={t.nombre} color="blue" />
                             ))}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 hidden md:table-cell">
                           <div className="space-y-0.5">
                             {ficheros.slice(0, 3).map((f) => (
                               <Badge key={f.ficheroId} text={f.tipoFicheroNombre} color="slate" />
                             ))}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-500 text-xs">{fecha}</td>
+                        <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{fecha}</td>
                         <td className="px-4 py-3">
                           {ficheros[0] && (
                             <a

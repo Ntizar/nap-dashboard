@@ -151,6 +151,14 @@ export interface GtfsFareAttribute {
   transfer_duration?: number
 }
 
+export interface GtfsParseWarning {
+  file: string
+  skippedRows: number
+  capped?: boolean
+  cappedAt?: number
+  encodingFallback?: string
+}
+
 export interface GtfsData {
   // Core
   agencies: GtfsAgency[]
@@ -168,6 +176,8 @@ export interface GtfsData {
   fareAttributes: GtfsFareAttribute[]
   // Available files list (for UI to know what data is present)
   availableFiles: string[]
+  // Parse warnings (malformed rows, encoding fallbacks, caps)
+  parseWarnings: GtfsParseWarning[]
   // Derived indexes
   shapesByShapeId: Map<string, GtfsShape[]>
   routeByTripId: Map<string, GtfsRoute>
@@ -181,38 +191,65 @@ export interface GtfsData {
 
 // ── CSV parser ────────────────────────────────────────────────────────────────
 
-function parseCsv(text: string): Record<string, string>[] {
+interface ParseCsvResult {
+  rows: Record<string, string>[]
+  skippedRows: number
+}
+
+function parseCsv(text: string): ParseCsvResult {
   const lines = text.replace(/\r/g, '').split('\n').filter(Boolean)
-  if (lines.length < 2) return []
+  if (lines.length < 2) return { rows: [], skippedRows: 0 }
 
   const headerLine = lines[0].startsWith('\ufeff') ? lines[0].slice(1) : lines[0]
   const headers = headerLine.split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
 
-  return lines.slice(1).map((line) => {
-    const values: string[] = []
-    let current = ''
-    let inQuotes = false
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i]
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
-        else inQuotes = !inQuotes
-      } else if (ch === ',' && !inQuotes) {
-        values.push(current.trim())
-        current = ''
-      } else {
-        current += ch
+  let skippedRows = 0
+  const rows: Record<string, string>[] = []
+
+  for (const line of lines.slice(1)) {
+    try {
+      const values: string[] = []
+      let current = ''
+      let inQuotes = false
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+          else inQuotes = !inQuotes
+        } else if (ch === ',' && !inQuotes) {
+          values.push(current.trim())
+          current = ''
+        } else {
+          current += ch
+        }
       }
+      values.push(current.trim())
+      const row: Record<string, string> = {}
+      headers.forEach((h, i) => { row[h] = values[i] ?? '' })
+      rows.push(row)
+    } catch {
+      skippedRows++
     }
-    values.push(current.trim())
-    const row: Record<string, string> = {}
-    headers.forEach((h, i) => { row[h] = values[i] ?? '' })
-    return row
-  })
+  }
+
+  return { rows, skippedRows }
 }
 
-function decode(bytes: Uint8Array): string {
-  return new TextDecoder('utf-8').decode(bytes)
+/**
+ * Decode bytes with UTF-8, falling back to windows-1252 if replacement
+ * characters are detected (common in older Spanish operator feeds).
+ */
+function decode(bytes: Uint8Array): { text: string; encoding: string } {
+  const utf8 = new TextDecoder('utf-8').decode(bytes)
+  if (utf8.includes('\uFFFD')) {
+    try {
+      const latin1 = new TextDecoder('windows-1252').decode(bytes)
+      return { text: latin1, encoding: 'windows-1252' }
+    } catch {
+      // windows-1252 not available in this environment, use utf-8 as-is
+    }
+  }
+  return { text: utf8, encoding: 'utf-8' }
 }
 
 function b(val: string): boolean {
@@ -225,13 +262,19 @@ export function parseGtfsZip(buffer: ArrayBuffer): GtfsData {
   const files = unzipSync(new Uint8Array(buffer))
 
   const availableFiles: string[] = Object.keys(files).map((k) => k.split('/').pop() ?? k)
+  const parseWarnings: GtfsParseWarning[] = []
 
   const getFile = (name: string): Record<string, string>[] => {
     const key = Object.keys(files).find(
       (k) => k.toLowerCase().endsWith(name.toLowerCase())
     )
     if (!key) return []
-    return parseCsv(decode(files[key]))
+    const { text, encoding } = decode(files[key])
+    const { rows, skippedRows } = parseCsv(text)
+    const warning: GtfsParseWarning = { file: name, skippedRows }
+    if (encoding !== 'utf-8') warning.encodingFallback = encoding
+    if (skippedRows > 0 || encoding !== 'utf-8') parseWarnings.push(warning)
+    return rows
   }
 
   // ── Core ──────────────────────────────────────────────────────────────────
@@ -291,7 +334,19 @@ export function parseGtfsZip(buffer: ArrayBuffer): GtfsData {
   }))
 
   // stop_times puede ser enorme — limitamos a 100k para no crashear el browser
-  const rawStopTimes = getFile('stop_times.txt').slice(0, 100000)
+  const STOP_TIMES_CAP = 100000
+  const rawStopTimesRows = getFile('stop_times.txt')
+  const isCapped = rawStopTimesRows.length >= STOP_TIMES_CAP
+  const rawStopTimes = rawStopTimesRows.slice(0, STOP_TIMES_CAP)
+  if (isCapped) {
+    const existing = parseWarnings.find(w => w.file === 'stop_times.txt')
+    if (existing) {
+      existing.capped = true
+      existing.cappedAt = STOP_TIMES_CAP
+    } else {
+      parseWarnings.push({ file: 'stop_times.txt', skippedRows: 0, capped: true, cappedAt: STOP_TIMES_CAP })
+    }
+  }
   const stopTimes: GtfsStopTime[] = rawStopTimes.map((r) => ({
     trip_id: r.trip_id ?? '',
     stop_id: r.stop_id ?? '',
@@ -438,6 +493,7 @@ export function parseGtfsZip(buffer: ArrayBuffer): GtfsData {
     feedInfo,
     fareAttributes,
     availableFiles,
+    parseWarnings,
     shapesByShapeId,
     routeByTripId,
     stopById,
@@ -469,11 +525,41 @@ export function routeColor(route: GtfsRoute): string {
   return ROUTE_TYPE_COLORS[route.route_type] ?? '#6b7280'
 }
 
+/** Route type names including European extended types (100–1700). */
 export function routeTypeName(type: number): string {
   const names: Record<number, string> = {
+    // GTFS standard
     0: 'Tranvía', 1: 'Metro', 2: 'Ferrocarril', 3: 'Bus',
     4: 'Ferry', 5: 'Teleférico', 6: 'Góndola', 7: 'Funicular',
     11: 'Trolebús', 12: 'Monorraíl',
+    // European extended (NeTEx/GTFS-regional)
+    100: 'Ferroviario', 101: 'Alta Velocidad', 102: 'Larga Distancia',
+    103: 'Interregional', 104: 'Coche-Cama', 105: 'Tren Cama',
+    106: 'Regional', 107: 'Turístico', 108: 'Lanzadera',
+    109: 'Cercanías', 110: 'Reemplazo', 111: 'Especial',
+    112: 'Servicio Portuario', 113: 'Tren-Bus', 114: 'Van-Lanzadera',
+    115: 'Tren Crosscountry', 116: 'Vehículo todo terreno',
+    117: 'eVehículo', 200: 'Autocar', 201: 'Autocar Internacional',
+    202: 'Autocar Nacional', 203: 'Lanzadera Autocar',
+    204: 'Autocar Regional', 208: 'Autocar Escolar',
+    400: 'Ferroviario Urbano', 401: 'Metro Urbano', 402: 'Metro Subterráneo',
+    403: 'Ferroviario Urbano (otro)', 404: 'Monorraíl Urbano',
+    500: 'Metro', 600: 'Teleférico Urbano',
+    700: 'Autobús', 701: 'Bus Regional', 702: 'Bus Exprés',
+    703: 'Bus Paradas Limitadas', 704: 'Bus Local',
+    705: 'Bus Nocturno', 706: 'Bus a Demanda', 707: 'Lanzadera Bus',
+    708: 'Bus Escolar', 709: 'Minibús', 710: 'Bus Turístico',
+    711: 'Bus Comarcal', 712: 'Bus Park & Ride',
+    713: 'Bus in-Sight', 714: 'Taxi Compartido',
+    715: 'Bus de Alta Frecuencia', 716: 'Bus Exprés de Alta Velocidad',
+    800: 'Trolebús', 900: 'Tranvía', 901: 'Tranvía Ciudad',
+    902: 'Tranvía Local', 903: 'Tranvía Regional',
+    904: 'Tranvía Turístico', 905: 'Tranvía Lanzadera',
+    906: 'Tranvía Especial', 1000: 'Transporte Acuático',
+    1100: 'Transporte Aéreo', 1200: 'Ferry', 1300: 'Teleférico Aéreo',
+    1400: 'Funicular', 1500: 'Taxi', 1501: 'Taxi Compartido',
+    1502: 'Vehículo Alquiler', 1503: 'Rideshare',
+    1700: 'Otros',
   }
   return names[type] ?? `Tipo ${type}`
 }
