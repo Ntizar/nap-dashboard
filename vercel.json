@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/nap/:path*",
+      "destination": "/api/nap/proxy"
+    }
+  ]
+}

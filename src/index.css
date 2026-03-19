@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* Reset base para que Tailwind controle el layout */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fix para que el mapa de Leaflet no tenga tiles rotos */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+}
