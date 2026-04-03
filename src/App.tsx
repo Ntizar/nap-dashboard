@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sidebar } from './components/layout/Sidebar'
 import { ApiKeyProvider, useApiKey } from './context/ApiKeyContext'
@@ -47,7 +47,8 @@ function AppShell() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/" element={<Overview onMenuToggle={() => setSidebarOpen(true)} />} />
+            <Route path="/" element={<Navigate to="/gtfs" replace />} />
+            <Route path="/resumen" element={<Overview onMenuToggle={() => setSidebarOpen(true)} />} />
             <Route path="/datasets" element={<Datasets onMenuToggle={() => setSidebarOpen(true)} />} />
             <Route path="/operadores" element={<Operadores onMenuToggle={() => setSidebarOpen(true)} />} />
             <Route path="/mapa" element={<Mapa onMenuToggle={() => setSidebarOpen(true)} />} />

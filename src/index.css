@@ -89,3 +89,13 @@ input, select, textarea {
 .leaflet-popup-content {
   margin: 10px 12px;
 }
+
+/* ── Ajustes de contraste en fondos claros ─────────────────────────────────── */
+.text-slate-300 { color: #64748b; }
+.text-slate-400 { color: #475569; }
+.text-slate-500 { color: #334155; }
+
+a.text-slate-400:hover,
+a.text-slate-500:hover {
+  color: var(--nap-blue-dark);
+}

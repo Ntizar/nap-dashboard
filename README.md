@@ -89,45 +89,6 @@ Browser → /api/nap/* → [Vercel Proxy] → nap.transportes.gob.es
 
 ---
 
-## 💻 Setup local
-
-**Requisitos:** Node.js >= 20.15.0, npm >= 10
-
-```bash
-git clone https://github.com/tu-usuario/nap-dashboard.git
-cd nap-dashboard
-npm install
-```
-
-Crea el fichero `.env.local` con tu API key del NAP (puedes solicitarla en [nap.transportes.gob.es](https://nap.transportes.gob.es)):
-
-```bash
-cp .env.example .env.local
-# Edita .env.local:
-# NAP_API_KEY=tu-api-key-aqui
-```
-
-Arranca el servidor de desarrollo:
-
-```bash
-npm run dev
-```
-
-Abre [http://localhost:5173](http://localhost:5173). El proxy de Vite intercepta las llamadas a `/api/nap/*` automáticamente.
-
----
-
-## 🚀 Deploy en Vercel
-
-1. Sube el repositorio a GitHub
-2. Importa el proyecto en [vercel.com/new](https://vercel.com/new)
-3. En **Environment Variables**, añade `NAP_API_KEY` con tu API key del NAP
-4. Haz clic en **Deploy**
-
-Vercel detecta automáticamente la configuración de Vite y aplica `vercel.json`.
-
----
-
 ## ⚠️ Limitaciones conocidas
 
 - Ficheros GTFS muy grandes (>15 MB descomprimidos) pueden tardar varios segundos en procesarse — el parsing ocurre en el hilo principal del navegador.
