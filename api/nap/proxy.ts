@@ -38,19 +38,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const napPath = url.pathname.replace(/^\/api\/nap\/?/, '')
   const targetUrl = `${NAP_BASE}/${napPath}${url.search}`
 
+  const method = (req.method ?? 'GET').toUpperCase()
+  const hasBody = method !== 'GET' && method !== 'HEAD'
+
   const headers: HeadersInit = {
     ApiKey: apiKey,
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
+    Accept: '*/*',
+  }
+
+  let upstreamBody: BodyInit | undefined
+  if (hasBody) {
+    if (typeof req.body === 'string' || req.body instanceof Buffer) {
+      upstreamBody = req.body
+    } else if (req.body != null) {
+      upstreamBody = JSON.stringify(req.body)
+    }
+
+    if (upstreamBody) {
+      headers['Content-Type'] = (req.headers['content-type'] as string) ?? 'application/json'
+    }
   }
 
   try {
     const upstream = await fetch(targetUrl, {
-      method: req.method ?? 'GET',
+      method,
       headers,
-      body: req.method !== 'GET' && req.method !== 'HEAD'
-        ? JSON.stringify(req.body)
-        : undefined,
+      body: upstreamBody,
     })
 
     const contentType = upstream.headers.get('content-type') ?? ''

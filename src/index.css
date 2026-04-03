@@ -1,16 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-/* ── Variables de color NAP ────────────────────────────────────────────────── */
+/* ── Variables de color NTizar / NAP ───────────────────────────────────────── */
 :root {
-  --nap-blue: #1a56a0;
-  --nap-blue-light: #2b6cb0;
-  --nap-blue-dark: #0f3460;
-  --nap-orange: #e87722;
+  --ntizar-blue-600: #2563eb;
+  --ntizar-blue-700: #1d4ed8;
+  --ntizar-blue-900: #1e3a8a;
+  --ntizar-orange-500: #f97316;
+  --ntizar-orange-600: #ea580c;
+  --ntizar-surface: #ffffff;
+  --ntizar-bg: #f4f7ff;
+  --ntizar-text: #0f1729;
+
+  --nap-blue: var(--ntizar-blue-700);
+  --nap-blue-light: var(--ntizar-blue-600);
+  --nap-blue-dark: var(--ntizar-blue-900);
+  --nap-orange: var(--ntizar-orange-600);
   --nap-yellow: #f5a623;
   --nap-teal: #00a896;
-  --nap-bg: #f4f6f8;
-  --nap-text: #1a202c;
+  --nap-bg: var(--ntizar-bg);
+  --nap-text: var(--ntizar-text);
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────────── */
@@ -24,8 +33,15 @@ html, body, #root {
   padding: 0;
   font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: var(--nap-bg);
+  background:
+    radial-gradient(1200px 500px at 5% -10%, rgba(37, 99, 235, 0.12), transparent 55%),
+    radial-gradient(900px 420px at 95% 0%, rgba(249, 115, 22, 0.1), transparent 50%),
+    var(--nap-bg);
   color: var(--nap-text);
+}
+
+body {
+  min-height: 100vh;
 }
 
 /* ── Tailwind custom colors (utility classes) ─────────────────────────────── */

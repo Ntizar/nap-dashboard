@@ -78,8 +78,17 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/nap/, ''),
           configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
-              proxyReq.setHeader('ApiKey', env.NAP_API_KEY ?? '')
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const headerApiKey =
+                Array.isArray(req.headers['x-api-key'])
+                  ? req.headers['x-api-key'][0]
+                  : req.headers['x-api-key']
+
+              const apiKey = env.NAP_API_KEY || headerApiKey || ''
+
+              if (apiKey) {
+                proxyReq.setHeader('ApiKey', apiKey)
+              }
             })
           },
           bypass: (req) => {
